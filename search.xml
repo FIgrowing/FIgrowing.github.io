@@ -1,6 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>Redis之缓存问题</title>
+    <url>/2023/efe9ee66.html</url>
+    <content><![CDATA[<h1 id="Redis中的缓存问题"><a href="#Redis中的缓存问题" class="headerlink" title="Redis中的缓存问题"></a>Redis中的缓存问题</h1><h2 id="Redis有哪些缓存问题？"><a href="#Redis有哪些缓存问题？" class="headerlink" title="Redis有哪些缓存问题？"></a>Redis有哪些缓存问题？</h2><ul>
+<li><strong>缓存预热：</strong>在服务上线之前我们可以提前将MySQL中的数据导入Redis中(可以利用@PostConstruct注解)</li>
+<li><strong>缓存雪崩：</strong>当Redis主机挂了，或者全盘崩溃，亦或者大面积的key在同一时间内失效，导致大量请求打到MySQL上</li>
+<li><strong>缓存穿透：</strong>请求去查询一条记录，当Redis中没有时，它会去MySQL中查询，结果发现也没用。这样就导致一些无效的非法不存在的数据一直打到MySQL上，给MySQL增加了不必要的压力，使Redis成了一个摆设</li>
+<li><strong>缓存击穿：</strong>大量请求查询一个热点key时，这个热点key恰好失效，导致这些请求打到MySQL上，令MySQL在短时间内压力倍增</li>
+</ul>
+<p>##如何预防和解决这些缓存问题</p>
+<h3 id="缓存预热"><a href="#缓存预热" class="headerlink" title="缓存预热"></a>缓存预热</h3><p>在服务上线之前我们可以提前将MySQL中的数据导入Redis中(可以利用@PostConstruct注解)</p>
+<h3 id="缓存雪崩"><a href="#缓存雪崩" class="headerlink" title="缓存雪崩"></a>缓存雪崩</h3><ul>
+<li><p>key直接设置为永不过期或者错开过期时间</p>
+</li>
+<li><p>Redis集群实现高可用(主从+哨兵；Redis Cluster；开启Redis持久化机制rdb&#x2F;aof，使之尽快回复Redis缓存)</p>
+</li>
+<li><p>多缓存结合预防雪崩(cache本地缓存+Redis缓存)</p>
+</li>
+<li><p>服务降级，使用Hystrix或者阿里sentinel降级，将阻止大量请求打到MySQL上，既是断开服务</p>
+</li>
+</ul>
+<h3 id="缓存穿透"><a href="#缓存穿透" class="headerlink" title="缓存穿透"></a>缓存穿透</h3><p><strong>隐患：</strong>既不在Redis，也不在MySQL，容易造成MySQL暴击，黑客也容易利用这点故意制造一些不存在的key频繁大量的攻击你的MySQL服务器，存在一定安全隐患</p>
+<h4 id="方案一"><a href="#方案一" class="headerlink" title="方案一"></a>方案一</h4><p>空对象缓存或者缺省。即，每当有不存在的key访问Redis和MySQL无果后，返回null给调用者，然后将这个key设置为null回写Redis，这样，下次这个key再被查询的时候就可以不用查询数据库了，就可以一定程度上缓解穿透问题。<strong>但是，该方案依然存在问题，黑客可以利用不同的不存在的非法key来攻击，这样一方面给你数据库增加不小压力，另一方面Redis会积累许多没用的key</strong></p>
+<h4 id="方案二"><a href="#方案二" class="headerlink" title="方案二"></a>方案二</h4><p>使用布隆过滤器，这里不做过多解释，以下是布隆过滤器结合Redis解决穿透的原理图，有兴趣的同学可以去自行了解。</p>
+<p><img src="/../images/5-1.png"></p>
+<h2 id="缓存击穿"><a href="#缓存击穿" class="headerlink" title="缓存击穿"></a>缓存击穿</h2><p><strong>方案一：</strong>设置差异失效时间，对于热点key，干脆不设置失效时间</p>
+<p><strong>方案二：</strong>采用双检加锁策略(多个线程同时去查询数据库的这条数据，那么我们可以在第一个查询数据的请求上使用一个 互斥锁来锁住它。其他的线程走到这一步拿不到锁就等着，等第一个线程查询到了数据，然后做缓存。后面的线程进来发现已经有缓存了，就直接走缓存)</p>
+<p><strong>方案三：</strong>使用双缓存机制。对于同一个数据设置两块缓存，主A从B。更新时先更新B，再删除并更新A；查询时，先查询A，如果A没有就查询B缓存。</p>
+<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><table>
+<thead>
+<tr>
+<th align="center">缓存问题</th>
+<th align="center">产生原因</th>
+<th align="center">解决方案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">缓存更新方式</td>
+<td align="center">数据变更，缓存时效性</td>
+<td align="center">同步更新，失效更新，异步更新，定时更新</td>
+</tr>
+<tr>
+<td align="center">缓存不一致</td>
+<td align="center">同步更新失败、异步更新</td>
+<td align="center">增加重试、补偿任务、最终一致</td>
+</tr>
+<tr>
+<td align="center">缓存穿透</td>
+<td align="center">恶意攻击</td>
+<td align="center">空对象缓存，布隆过滤器</td>
+</tr>
+<tr>
+<td align="center">缓存击穿</td>
+<td align="center">热点key失效</td>
+<td align="center">双锁策略，双缓存互斥更新，差异失效时间</td>
+</tr>
+<tr>
+<td align="center">缓存雪崩</td>
+<td align="center">缓存挂掉</td>
+<td align="center">服务降级熔断，高可用集群</td>
+</tr>
+</tbody></table>
+]]></content>
+      <tags>
+        <tag>Redis知识分享</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>MVCC机制及其原理</title>
     <url>/2023/55c34784.html</url>
     <content><![CDATA[<p>helllo！大家好，今天主要给大家分享一篇有关MySQL中可重复读隔离级别的实现原理，废话不多说，我们直接进入正题！</p>
@@ -212,73 +279,6 @@
 </li>
 </ul>
 ]]></content>
-  </entry>
-  <entry>
-    <title>Redis之缓存问题</title>
-    <url>/2023/efe9ee66.html</url>
-    <content><![CDATA[<h1 id="Redis中的缓存问题"><a href="#Redis中的缓存问题" class="headerlink" title="Redis中的缓存问题"></a>Redis中的缓存问题</h1><h2 id="Redis有哪些缓存问题？"><a href="#Redis有哪些缓存问题？" class="headerlink" title="Redis有哪些缓存问题？"></a>Redis有哪些缓存问题？</h2><ul>
-<li><strong>缓存预热：</strong>在服务上线之前我们可以提前将MySQL中的数据导入Redis中(可以利用@PostConstruct注解)</li>
-<li><strong>缓存雪崩：</strong>当Redis主机挂了，或者全盘崩溃，亦或者大面积的key在同一时间内失效，导致大量请求打到MySQL上</li>
-<li><strong>缓存穿透：</strong>请求去查询一条记录，当Redis中没有时，它会去MySQL中查询，结果发现也没用。这样就导致一些无效的非法不存在的数据一直打到MySQL上，给MySQL增加了不必要的压力，使Redis成了一个摆设</li>
-<li><strong>缓存击穿：</strong>大量请求查询一个热点key时，这个热点key恰好失效，导致这些请求打到MySQL上，令MySQL在短时间内压力倍增</li>
-</ul>
-<p>##如何预防和解决这些缓存问题</p>
-<h3 id="缓存预热"><a href="#缓存预热" class="headerlink" title="缓存预热"></a>缓存预热</h3><p>在服务上线之前我们可以提前将MySQL中的数据导入Redis中(可以利用@PostConstruct注解)</p>
-<h3 id="缓存雪崩"><a href="#缓存雪崩" class="headerlink" title="缓存雪崩"></a>缓存雪崩</h3><ul>
-<li><p>key直接设置为永不过期或者错开过期时间</p>
-</li>
-<li><p>Redis集群实现高可用(主从+哨兵；Redis Cluster；开启Redis持久化机制rdb&#x2F;aof，使之尽快回复Redis缓存)</p>
-</li>
-<li><p>多缓存结合预防雪崩(cache本地缓存+Redis缓存)</p>
-</li>
-<li><p>服务降级，使用Hystrix或者阿里sentinel降级，将阻止大量请求打到MySQL上，既是断开服务</p>
-</li>
-</ul>
-<h3 id="缓存穿透"><a href="#缓存穿透" class="headerlink" title="缓存穿透"></a>缓存穿透</h3><p><strong>隐患：</strong>既不在Redis，也不在MySQL，容易造成MySQL暴击，黑客也容易利用这点故意制造一些不存在的key频繁大量的攻击你的MySQL服务器，存在一定安全隐患</p>
-<h4 id="方案一"><a href="#方案一" class="headerlink" title="方案一"></a>方案一</h4><p>空对象缓存或者缺省。即，每当有不存在的key访问Redis和MySQL无果后，返回null给调用者，然后将这个key设置为null回写Redis，这样，下次这个key再被查询的时候就可以不用查询数据库了，就可以一定程度上缓解穿透问题。<strong>但是，该方案依然存在问题，黑客可以利用不同的不存在的非法key来攻击，这样一方面给你数据库增加不小压力，另一方面Redis会积累许多没用的key</strong></p>
-<h4 id="方案二"><a href="#方案二" class="headerlink" title="方案二"></a>方案二</h4><p>使用布隆过滤器，这里不做过多解释，以下是布隆过滤器结合Redis解决穿透的原理图，有兴趣的同学可以去自行了解。</p>
-<p><img src="/../images/5-1.png"></p>
-<h2 id="缓存击穿"><a href="#缓存击穿" class="headerlink" title="缓存击穿"></a>缓存击穿</h2><p><strong>方案一：</strong>设置差异失效时间，对于热点key，干脆不设置失效时间</p>
-<p><strong>方案二：</strong>采用双检加锁策略(多个线程同时去查询数据库的这条数据，那么我们可以在第一个查询数据的请求上使用一个 互斥锁来锁住它。其他的线程走到这一步拿不到锁就等着，等第一个线程查询到了数据，然后做缓存。后面的线程进来发现已经有缓存了，就直接走缓存)</p>
-<p><strong>方案三：</strong>使用双缓存机制。对于同一个数据设置两块缓存，主A从B。更新时先更新B，再删除并更新A；查询时，先查询A，如果A没有就查询B缓存。</p>
-<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><table>
-<thead>
-<tr>
-<th align="center">缓存问题</th>
-<th align="center">产生原因</th>
-<th align="center">解决方案</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="center">缓存更新方式</td>
-<td align="center">数据变更，缓存时效性</td>
-<td align="center">同步更新，失效更新，异步更新，定时更新</td>
-</tr>
-<tr>
-<td align="center">缓存不一致</td>
-<td align="center">同步更新失败、异步更新</td>
-<td align="center">增加重试、补偿任务、最终一致</td>
-</tr>
-<tr>
-<td align="center">缓存穿透</td>
-<td align="center">恶意攻击</td>
-<td align="center">空对象缓存，布隆过滤器</td>
-</tr>
-<tr>
-<td align="center">缓存击穿</td>
-<td align="center">热点key失效</td>
-<td align="center">双锁策略，双缓存互斥更新，差异失效时间</td>
-</tr>
-<tr>
-<td align="center">缓存雪崩</td>
-<td align="center">缓存挂掉</td>
-<td align="center">服务降级熔断，高可用集群</td>
-</tr>
-</tbody></table>
-]]></content>
-      <tags>
-        <tag>Redis知识分享</tag>
-      </tags>
   </entry>
   <entry>
     <title>MySQL之锁全家桶</title>
@@ -660,11 +660,6 @@
       </tags>
   </entry>
   <entry>
-    <title>tags</title>
-    <url>/tags/index.html</url>
-    <content><![CDATA[]]></content>
-  </entry>
-  <entry>
     <title>categories</title>
     <url>/categories/index.html</url>
     <content><![CDATA[]]></content>
@@ -672,6 +667,11 @@
   <entry>
     <title>友情链接</title>
     <url>/link/index.html</url>
+    <content><![CDATA[]]></content>
+  </entry>
+  <entry>
+    <title>tags</title>
+    <url>/tags/index.html</url>
     <content><![CDATA[]]></content>
   </entry>
 </search>
