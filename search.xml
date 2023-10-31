@@ -279,6 +279,9 @@
 </li>
 </ul>
 ]]></content>
+      <tags>
+        <tag>设计模式</tag>
+      </tags>
   </entry>
   <entry>
     <title>Redis分布式锁</title>
