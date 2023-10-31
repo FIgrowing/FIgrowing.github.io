@@ -1,35 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>设计模式七大原则</title>
-    <url>/2023/bf020d01.html</url>
-    <content><![CDATA[<h1 id="设计模式七大原则"><a href="#设计模式七大原则" class="headerlink" title="设计模式七大原则"></a>设计模式七大原则</h1><h2 id="单一职责原则"><a href="#单一职责原则" class="headerlink" title="单一职责原则"></a>单一职责原则</h2><p>简述：对类来说，一个类应该只负责一项职责</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">// demo1</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Vehicle</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">run</span> <span class="params">(String vehicle)</span>&#123;</span><br><span class="line">        system.out.println(vehicle + <span class="string">&quot;在公路上运行&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">// demo2</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Vehicleroad</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">run</span> <span class="params">(String vehicle)</span>&#123;</span><br><span class="line">        system.out.println(vehicle + <span class="string">&quot;在公路上运行&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Vehicleair</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">run</span> <span class="params">(String vehicle)</span>&#123;</span><br><span class="line">        system.out.println(vehicle + <span class="string">&quot;在天上上运行&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Vehiclesea</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">run</span> <span class="params">(String vehicle)</span>&#123;</span><br><span class="line">        system.out.println(vehicle + <span class="string">&quot;在海上运行&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-
-
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">//demo3</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Vehicle</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">runroad</span> <span class="params">(String vehicle)</span>&#123;</span><br><span class="line">        system.out.println(vehicle + <span class="string">&quot;在公路上运行&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">     <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">runair</span> <span class="params">(String vehicle)</span>&#123;</span><br><span class="line">        system.out.println(vehicle + <span class="string">&quot;在天上上运行&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">     <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">runsea</span><span class="params">(String vehicle)</span>&#123;</span><br><span class="line">        system.out.println(vehicle + <span class="string">&quot;在海上上运行&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h3 id="解释"><a href="#解释" class="headerlink" title="解释"></a>解释</h3><ul>
-<li>demo1中就违反了单一职责原则，demo1中的run方法太笼统，一个类的一个运行方法把所有交通运行方法都处理了，明显不合理。</li>
-<li>demo2就是严格遵守单一职责原则，但是存在一定缺陷，每个类都是重复的run方法但是创建了多个类，成本太高了</li>
-<li>demo3在方法层面做单一职责，每个方法只负责一个逻辑功能（在方法比较少时比较实用）</li>
-</ul>
-<h3 id="单一职责原则注意事项"><a href="#单一职责原则注意事项" class="headerlink" title="单一职责原则注意事项"></a>单一职责原则注意事项</h3><ul>
-<li><p>降低类的复杂度，一个类只负责一项职责。</p>
-</li>
-<li><p>提高类的可读性，可维护性</p>
-</li>
-<li><p>降低变更引起的风险</p>
-</li>
-<li><p>通常情况下，<strong>我们应当遵守单一职责原则</strong>，只有逻辑足够简单，才可以在代码级违反单一职责原则；只有类中方法数量足够少，可以在方法级别保持单一职责原则</p>
-</li>
-</ul>
-]]></content>
-  </entry>
-  <entry>
     <title>MVCC机制及其原理</title>
     <url>/2023/55c34784.html</url>
     <content><![CDATA[<p>helllo！大家好，今天主要给大家分享一篇有关MySQL中可重复读隔离级别的实现原理，废话不多说，我们直接进入正题！</p>
@@ -212,6 +183,35 @@
       <tags>
         <tag>MySQL技术分享</tag>
       </tags>
+  </entry>
+  <entry>
+    <title>设计模式七大原则</title>
+    <url>/2023/bf020d01.html</url>
+    <content><![CDATA[<h1 id="设计模式七大原则"><a href="#设计模式七大原则" class="headerlink" title="设计模式七大原则"></a>设计模式七大原则</h1><h2 id="单一职责原则"><a href="#单一职责原则" class="headerlink" title="单一职责原则"></a>单一职责原则</h2><p>简述：对类来说，一个类应该只负责一项职责</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">// demo1</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Vehicle</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">run</span> <span class="params">(String vehicle)</span>&#123;</span><br><span class="line">        system.out.println(vehicle + <span class="string">&quot;在公路上运行&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">// demo2</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Vehicleroad</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">run</span> <span class="params">(String vehicle)</span>&#123;</span><br><span class="line">        system.out.println(vehicle + <span class="string">&quot;在公路上运行&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Vehicleair</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">run</span> <span class="params">(String vehicle)</span>&#123;</span><br><span class="line">        system.out.println(vehicle + <span class="string">&quot;在天上上运行&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Vehiclesea</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">run</span> <span class="params">(String vehicle)</span>&#123;</span><br><span class="line">        system.out.println(vehicle + <span class="string">&quot;在海上运行&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">//demo3</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Vehicle</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">runroad</span> <span class="params">(String vehicle)</span>&#123;</span><br><span class="line">        system.out.println(vehicle + <span class="string">&quot;在公路上运行&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">     <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">runair</span> <span class="params">(String vehicle)</span>&#123;</span><br><span class="line">        system.out.println(vehicle + <span class="string">&quot;在天上上运行&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">     <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">runsea</span><span class="params">(String vehicle)</span>&#123;</span><br><span class="line">        system.out.println(vehicle + <span class="string">&quot;在海上上运行&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="解释"><a href="#解释" class="headerlink" title="解释"></a>解释</h3><ul>
+<li>demo1中就违反了单一职责原则，demo1中的run方法太笼统，一个类的一个运行方法把所有交通运行方法都处理了，明显不合理。</li>
+<li>demo2就是严格遵守单一职责原则，但是存在一定缺陷，每个类都是重复的run方法但是创建了多个类，成本太高了</li>
+<li>demo3在方法层面做单一职责，每个方法只负责一个逻辑功能（在方法比较少时比较实用）</li>
+</ul>
+<h3 id="单一职责原则注意事项"><a href="#单一职责原则注意事项" class="headerlink" title="单一职责原则注意事项"></a>单一职责原则注意事项</h3><ul>
+<li><p>降低类的复杂度，一个类只负责一项职责。</p>
+</li>
+<li><p>提高类的可读性，可维护性</p>
+</li>
+<li><p>降低变更引起的风险</p>
+</li>
+<li><p>通常情况下，<strong>我们应当遵守单一职责原则</strong>，只有逻辑足够简单，才可以在代码级违反单一职责原则；只有类中方法数量足够少，可以在方法级别保持单一职责原则</p>
+</li>
+</ul>
+]]></content>
   </entry>
   <entry>
     <title>Redis之缓存问题</title>
@@ -660,8 +660,8 @@
       </tags>
   </entry>
   <entry>
-    <title>友情链接</title>
-    <url>/link/index.html</url>
+    <title>tags</title>
+    <url>/tags/index.html</url>
     <content><![CDATA[]]></content>
   </entry>
   <entry>
@@ -670,8 +670,8 @@
     <content><![CDATA[]]></content>
   </entry>
   <entry>
-    <title>tags</title>
-    <url>/tags/index.html</url>
+    <title>友情链接</title>
+    <url>/link/index.html</url>
     <content><![CDATA[]]></content>
   </entry>
 </search>
