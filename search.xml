@@ -278,6 +278,58 @@
 <li><p>通常情况下，<strong>我们应当遵守单一职责原则</strong>，只有逻辑足够简单，才可以在代码级违反单一职责原则；只有类中方法数量足够少，可以在方法级别保持单一职责原则</p>
 </li>
 </ul>
+<h1 id="接口隔离原则"><a href="#接口隔离原则" class="headerlink" title="接口隔离原则"></a>接口隔离原则</h1><p><strong>介绍：</strong>客户端不应该依赖它不需要的接口，即一个类对另一个类的依赖 应该建立在最小的接口上</p>
+<p><strong>案例：</strong>接口一由五种方法，A，C两个类分别继承了接口一，B，D分别依赖接口中的方法1，2，4和1，3，5，如此一来就导致了D需要依赖C，但却只用到了C中的1，3，5方法，C实现了D不必要的方法，不是最小接口，AB亦然。</p>
+<p><img src="/../images/6-1.png"></p>
+<p><strong>代码改进</strong></p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">interface</span> <span class="title class_">x</span> &#123;</span><br><span class="line">    <span class="keyword">void</span> <span class="title function_">method1</span><span class="params">()</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">interface</span> <span class="title class_">y</span> &#123;</span><br><span class="line">    <span class="keyword">void</span> <span class="title function_">method2</span><span class="params">()</span>;</span><br><span class="line">    <span class="keyword">void</span> <span class="title function_">method4</span><span class="params">()</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">interface</span> <span class="title class_">z</span> &#123;</span><br><span class="line">    <span class="keyword">void</span> <span class="title function_">method3</span><span class="params">()</span>;</span><br><span class="line">    <span class="keyword">void</span> <span class="title function_">method5</span><span class="params">()</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">B</span> <span class="keyword">implements</span> <span class="title class_">x</span>, y &#123;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">method1</span><span class="params">()</span> &#123;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">method2</span><span class="params">()</span> &#123;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">method4</span><span class="params">()</span> &#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">D</span> <span class="keyword">implements</span> <span class="title class_">x</span>, z &#123;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">method1</span><span class="params">()</span> &#123;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">method3</span><span class="params">()</span> &#123;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">method5</span><span class="params">()</span> &#123;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id="依赖倒转原则"><a href="#依赖倒转原则" class="headerlink" title="依赖倒转原则"></a>依赖倒转原则</h2><p>依赖倒转原则(Dependence Inversion Principle)是指：</p>
+<ul>
+<li><p>高层模块不应该依赖低层模块，二者都应该依赖其抽象</p>
+</li>
+<li><p>抽象不应该依赖细节，细节应该依赖抽象</p>
+</li>
+<li><p>依赖倒转(倒置)的中心思想是面向接口编程</p>
+</li>
+<li><p>依赖倒转原则是基于这样的设计理念：相对于细节的多变性，抽象的东西要稳定的 多。以抽象为基础搭建的架构比以细节为基础的架构要稳定的多。在java中，抽象指的是接口或抽象类，细节就是具体的实现类</p>
+</li>
+<li><p>使用接口或抽象类的目的是制定好规范，而不涉及任何具体的操作，把展现细节的 任务交给他们的实现类去完成</p>
+</li>
+</ul>
+<h3 id="案例代码"><a href="#案例代码" class="headerlink" title="案例代码"></a>案例代码</h3><figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Email</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">getInfo</span><span class="params">()</span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;email&quot;</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Person</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">receive</span><span class="params">(Email email)</span></span><br><span class="line">    &#123;</span><br><span class="line">        System.out.println(email.getInfo());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>分析：</strong>如果要获取其他信息，如微信，那么我们要新增类，且person类中也要新增方法。但是如果我们把微信，邮件接收信息的方法封装到一个接口中，并让其实现该接口，这样就不用改动客户端，代码如下</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">interface</span> <span class="title class_">Receive</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">getInfo</span><span class="params">()</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Email</span> <span class="keyword">implements</span> <span class="title class_">Receive</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">getInfo</span><span class="params">()</span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;email&quot;</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">VX</span> <span class="keyword">implements</span> <span class="title class_">Receive</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">getInfo</span><span class="params">()</span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;VX&quot;</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Person</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">receive</span><span class="params">(Receive receive)</span></span><br><span class="line">    &#123;</span><br><span class="line">        System.out.println(receive.getInfo());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">DependencyInversion</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">        <span class="type">Person</span> <span class="variable">person</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Person</span>();</span><br><span class="line">        person.receive(<span class="keyword">new</span> <span class="title class_">Email</span>());</span><br><span class="line">        person.receive(<span class="keyword">new</span> <span class="title class_">VX</span>());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id="里氏替换原则"><a href="#里氏替换原则" class="headerlink" title="里氏替换原则"></a>里氏替换原则</h2><h3 id="OO中的继承性的思考和说明"><a href="#OO中的继承性的思考和说明" class="headerlink" title="OO中的继承性的思考和说明"></a>OO<strong>中的继承性的思考和说明</strong></h3><ul>
+<li><p>继承包含这样一层含义：父类中凡是已经实现好的方法，实际上是在设定规范和契 约，虽然它不强制要求所有的子类必须遵循这些契约，但是如果子类对这些已经实 现的方法任意修改，就会对整个继承体系造成破坏。</p>
+</li>
+<li><p>继承在给程序设计带来便利的同时，也带来了弊端。比如使用继承会给程序带来侵 入性，程序的可移植性降低，增加对象间的耦合性，如果一个类被其他的类所继承， 则当这个类需要修改时，必须考虑到所有的子类，并且父类修改后，所有涉及到子类的功能都有可能产生故障</p>
+</li>
+<li><p>问题提出：在编程中，如何正确的使用继承? &#x3D;&gt; <strong>里氏替换原则</strong></p>
+</li>
+</ul>
+<h3 id="基本介绍"><a href="#基本介绍" class="headerlink" title="基本介绍"></a>基本介绍</h3><ul>
+<li><p>里氏替换原则(Liskov Substitution Principle)在1988年，由麻省理工学院的以为姓里 的女士提出的。</p>
+</li>
+<li><p>如果对每个类型为T1的对象o1，都有类型为T2的对象o2，使得以T1定义的所有程序P在所有的对象o1都代换成o2时，程序P的行为没有发生变化，那么类型T2是类型T1的子类型。换句话说，所有引用基类的地方必须能透明地使用其子类的对象。</p>
+</li>
+<li><p>在使用继承时，遵循里氏替换原则，在子类中<strong>尽量</strong>不要重写父类的方法</p>
+</li>
+<li><p>里氏替换原则告诉我们，继承实际上让两个类耦合性增强了，<strong>在适当的情况下，可以通过聚合，组合，依赖 来解决问题。</strong></p>
+</li>
+</ul>
+<h3 id="案例"><a href="#案例" class="headerlink" title="案例"></a>案例</h3><figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">A</span> &#123;</span><br><span class="line"><span class="keyword">public</span> <span class="type">int</span> <span class="title function_">func1</span><span class="params">(<span class="type">int</span> num1, <span class="type">int</span> num2)</span> &#123;</span><br><span class="line"><span class="keyword">return</span> num1 - num2;</span><br><span class="line">&#125;&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">B</span> <span class="keyword">extends</span> <span class="title class_">A</span> &#123;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="type">int</span> <span class="title function_">func1</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b)</span> &#123;</span><br><span class="line"><span class="keyword">return</span> a + b;&#125;</span><br><span class="line"><span class="keyword">public</span> <span class="type">int</span> <span class="title function_">func2</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b)</span> &#123;</span><br><span class="line"><span class="keyword">return</span> func1(a, b) + <span class="number">9</span>;</span><br><span class="line">&#125;&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line"><span class="type">A</span> <span class="variable">a</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">A</span>();</span><br><span class="line">System.out.println(<span class="string">&quot;11-3=&quot;</span> + a.func1(<span class="number">11</span>, <span class="number">3</span>));</span><br><span class="line">System.out.println(<span class="string">&quot;1-8=&quot;</span> + a.func1(<span class="number">1</span>, <span class="number">8</span>));</span><br><span class="line">System.out.println(<span class="string">&quot;-----------------------&quot;</span>);</span><br><span class="line"><span class="type">B</span> <span class="variable">b</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">B</span>();</span><br><span class="line">System.out.println(<span class="string">&quot;11-3=&quot;</span> + b.func1(<span class="number">11</span>, <span class="number">3</span>));</span><br><span class="line">System.out.println(<span class="string">&quot;1-8=&quot;</span> + b.func1(<span class="number">1</span>, <span class="number">8</span>));</span><br><span class="line">System.out.println(<span class="string">&quot;11+3+9=&quot;</span> + b.func2(<span class="number">11</span>, <span class="number">3</span>));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>分析：</strong>我们发现原来运行正常的相减功能发生了错误。原因就是类B无意中重写了父类的 方法，造成原有功能出现错误。在实际编程中，我们常常会通过重写父类的方法完 成新的功能，这样写起来虽然简单，但整个继承体系的复用性会比较差。特别是运行多态比较频繁的时候</p>
+<p><strong>解决方法：</strong>通用的做法是：原来的父类和子类都继承一个更通俗的基类，原有的继承关系去掉， 采用依赖，聚合，组合等关系代替.</p>
+<h3 id="改进代码"><a href="#改进代码" class="headerlink" title="改进代码"></a>改进代码</h3><figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span>&#123;<span class="comment">//把更加基础的成员和方法写到基类中&#125;</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">A</span> <span class="keyword">extends</span> <span class="title class_">Base</span>&#123;</span><br><span class="line"><span class="keyword">public</span> <span class="type">int</span> <span class="title function_">func1</span><span class="params">(<span class="type">int</span> num1, <span class="type">int</span> num2)</span> &#123;</span><br><span class="line"><span class="keyword">return</span> num1 - num2;</span><br><span class="line">&#125;&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">B</span> <span class="keyword">extends</span> <span class="title class_">Base</span> &#123;</span><br><span class="line"><span class="comment">//如果B需要使用A的方法，使用组合关系</span></span><br><span class="line"><span class="keyword">private</span> <span class="type">A</span> <span class="variable">a</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">A</span>();</span><br><span class="line"><span class="comment">//此处可能是无意重写了A中的方法</span></span><br><span class="line"><span class="keyword">public</span> <span class="type">int</span> <span class="title function_">func1</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b)</span> &#123;</span><br><span class="line"><span class="keyword">return</span> a + b;&#125;</span><br><span class="line"><span class="keyword">public</span> <span class="type">int</span> <span class="title function_">func2</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b)</span> &#123;</span><br><span class="line"><span class="keyword">return</span> func1(a, b) + <span class="number">9</span>;</span><br><span class="line"><span class="keyword">public</span> <span class="type">int</span> <span class="title function_">func2</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b)</span> &#123;</span><br><span class="line"><span class="keyword">return</span> <span class="built_in">this</span>.a.func1(a,b);</span><br><span class="line">&#125;&#125;</span><br></pre></td></tr></table></figure>
+
 ]]></content>
       <tags>
         <tag>设计模式</tag>
@@ -660,6 +712,160 @@
 ]]></content>
       <tags>
         <tag>MySQL技术分享</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Redis双写一致性</title>
+    <url>/2023/b0280743.html</url>
+    <content><![CDATA[<h1 id="双写一致性是什么？"><a href="#双写一致性是什么？" class="headerlink" title="双写一致性是什么？"></a>双写一致性是什么？</h1><h2 id="什么是双写？"><a href="#什么是双写？" class="headerlink" title="什么是双写？"></a>什么是双写？</h2><p>双写其实是针对Redis缓存和MySQL数据库来说的，是指在写入数据时，将数据同时写入两个地方，一个是数据库，另一个是缓存。这样，当读取数据时，首先从缓存中读取，如果缓存中没有数据，则从数据库中读取并将其写入缓存。这种方法可以提高读取速度并减少对数据库的访问次数。</p>
+<h2 id="什么又是双写一致性？"><a href="#什么又是双写一致性？" class="headerlink" title="什么又是双写一致性？"></a>什么又是双写一致性？</h2><p>简单来说就是要保证数据库和Redis的数据要一致。</p>
+<ul>
+<li>如果Redis中有数据，则要和MySQL保持一致</li>
+<li>如果Redis中没有数据，则要将MySQL中最新值回写Redis</li>
+</ul>
+<p><img src="/../images/7-1.png"></p>
+<h2 id="代码实现"><a href="#代码实现" class="headerlink" title="代码实现"></a>代码实现</h2><figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> User <span class="title function_">findUserById2</span><span class="params">(Integer id)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="type">User</span> <span class="variable">user</span> <span class="operator">=</span> <span class="literal">null</span>;</span><br><span class="line">        <span class="type">String</span> <span class="variable">key</span> <span class="operator">=</span> CACHE_KEY_USER+id;</span><br><span class="line"></span><br><span class="line">        <span class="comment">//1 先从redis里面查询，如果有直接返回结果，如果没有再去查询mysql，</span></span><br><span class="line">        <span class="comment">// 第1次查询redis，加锁前</span></span><br><span class="line">        user = (User) redisTemplate.opsForValue().get(key);</span><br><span class="line">        <span class="keyword">if</span>(user == <span class="literal">null</span>) &#123;</span><br><span class="line">            <span class="comment">//2 大厂用，对于高QPS的优化，进来就先加锁，保证一个请求操作，让外面的redis等待一下，避免击穿mysql</span></span><br><span class="line">            <span class="keyword">synchronized</span> (UserService.class)&#123;</span><br><span class="line">                <span class="comment">//第2次查询redis，加锁后</span></span><br><span class="line">                user = (User) redisTemplate.opsForValue().get(key);</span><br><span class="line">                <span class="comment">//3 二次查redis还是null，可以去查mysql了(mysql默认有数据)</span></span><br><span class="line">                <span class="keyword">if</span> (user == <span class="literal">null</span>) &#123;</span><br><span class="line">                    <span class="comment">//4 查询mysql拿数据(mysql默认有数据)</span></span><br><span class="line">                    user = userMapper.selectByPrimaryKey(id);</span><br><span class="line">                    <span class="keyword">if</span> (user == <span class="literal">null</span>) &#123;</span><br><span class="line">                        <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">                    &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">                        <span class="comment">//5 mysql里面有数据的，需要回写redis，完成数据一致性的同步工作</span></span><br><span class="line">                        redisTemplate.opsForValue().setIfAbsent(key,user,<span class="number">7L</span>,TimeUnit.DAYS);</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> user;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+
+<h1 id="数据库与缓存双写更新策略"><a href="#数据库与缓存双写更新策略" class="headerlink" title="数据库与缓存双写更新策略"></a>数据库与缓存双写更新策略</h1><h2 id="可以停机的情况"><a href="#可以停机的情况" class="headerlink" title="可以停机的情况"></a>可以停机的情况</h2><p>服务降级，挂牌报错，建议直接开启单线程同步数据，不过一般生产环境下不允许停机</p>
+<h2 id="先更新数据库，在更新缓存"><a href="#先更新数据库，在更新缓存" class="headerlink" title="先更新数据库，在更新缓存"></a>先更新数据库，在更新缓存</h2><p><strong>问题一：</strong></p>
+<p>在更新玩数据库之后，如果回写失败，则会导致Redis与数据库中数据不一致</p>
+<p><strong>问题二：</strong></p>
+<p>在高并发环境下，由于存在网络延迟等问题，如果有两个线程执行以下操作</p>
+<table>
+<thead>
+<tr>
+<th align="center">线程A</th>
+<th align="center">线程B</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">update MySQL 100</td>
+<td align="center"></td>
+</tr>
+<tr>
+<td align="center"></td>
+<td align="center">update MySQL 80</td>
+</tr>
+<tr>
+<td align="center"></td>
+<td align="center">update Redis 80</td>
+</tr>
+<tr>
+<td align="center">update Redis 100</td>
+<td align="center"></td>
+</tr>
+</tbody></table>
+<p>这样就可能导致Redis和MySQL中数据不一致</p>
+<p>##先更新缓存，再更新数据库</p>
+<p>###问题一</p>
+<p>一般业务最终都是以数据库数据为最后评判标准，如果先更新缓存再更新数据库，会导致数据库中的值为旧值，当出现意外时就会以数据库旧值作为标准，存在安全隐患</p>
+<h3 id="问题二"><a href="#问题二" class="headerlink" title="问题二"></a>问题二</h3><p>在高并发环境下，由于存在网络延迟等问题，如果有两个线程执行以下操作</p>
+<table>
+<thead>
+<tr>
+<th align="center">线程A</th>
+<th align="center">线程B</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">update Redis 100</td>
+<td align="center"></td>
+</tr>
+<tr>
+<td align="center"></td>
+<td align="center">update Redis 80</td>
+</tr>
+<tr>
+<td align="center"></td>
+<td align="center">update MySQL 80</td>
+</tr>
+<tr>
+<td align="center">update MySQL 100</td>
+<td align="center"></td>
+</tr>
+</tbody></table>
+<p>这样就可能导致Redis和MySQL中数据不一致</p>
+<h2 id="先删除缓存，再更新数据库"><a href="#先删除缓存，再更新数据库" class="headerlink" title="先删除缓存，再更新数据库"></a>先删除缓存，再更新数据库</h2><h3 id="问题一"><a href="#问题一" class="headerlink" title="问题一"></a>问题一</h3><p>先删除缓存值再更新数据库，有可能导致请求因缓存缺失而访问数据库，给数据库带来压力导致打满mysql</p>
+<h3 id="问题二-1"><a href="#问题二-1" class="headerlink" title="问题二"></a>问题二</h3><ul>
+<li><p>请求A进行写操作，删除redis缓存后，工作正在进行中，更新mysql……A还么有彻底更新完mysql，还没commit</p>
+</li>
+<li><p>请求B开工查询，查询redis发现缓存不存在(被A从redis中删除了)</p>
+</li>
+<li><p>请求B继续，去数据库查询得到了mysql中的旧值(A还没有更新完)</p>
+</li>
+<li><p>请求B将旧值写回redis缓存</p>
+</li>
+<li><p>请求A将新值写入mysql数据库</p>
+</li>
+</ul>
+<p>上述情况就会导致不一致的情形出现。</p>
+<table>
+<thead>
+<tr>
+<th align="center">时间</th>
+<th align="center">线程A</th>
+<th align="center">线程B</th>
+<th align="center">存在的问题</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">T1</td>
+<td align="center">请求A进行写操作，删除缓存成功后，工作正在mysql进行中……</td>
+<td align="center"></td>
+<td align="center"></td>
+</tr>
+<tr>
+<td align="center">T2</td>
+<td align="center"></td>
+<td align="center">1 缓存中读取不到，立刻读mysql，由于A还没对mysql更新完，读到的是旧值<br />2 还把从mysql读取的旧值，写回了redis</td>
+<td align="center">1 A还没有更新完mysql，导致B读到了旧值<br />2 线程B遵守回写机制，把旧值写回redis，导致其它请求读取的还是旧值，A白干了</td>
+</tr>
+<tr>
+<td align="center">T3</td>
+<td align="center">A更新完mysql数据库的值，over</td>
+<td align="center"></td>
+<td align="center">redis是被B写回的旧值，<br />mysql是被A更新的新值。<br />出现了，数据不一致问题。</td>
+</tr>
+</tbody></table>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>先删缓存，再更新数据库如果数据库更新失败或超时或返回不及时，导致B线程请求访问缓存时发现redis里面没数据，缓存缺失，B再去读取mysql时，从数据库中读取到旧值，还写回redis，导致A白干了。</p>
+<h3 id="解决办法"><a href="#解决办法" class="headerlink" title="解决办法"></a>解决办法</h3><p><strong>采用延时双删策略</strong>，即更新数据库的线程操作完成后先睡眠一段时间，结束时间后再将缓存删掉(此时删除的是B线程回写Redis的脏数据)，<strong>但是要确保线程A睡眠的时间要大于线程B读取数据和回写Redis的时间，此处可以采用看门狗策略</strong></p>
+<h2 id="先更新数据库，再删除缓存"><a href="#先更新数据库，再删除缓存" class="headerlink" title="先更新数据库，再删除缓存"></a>先更新数据库，再删除缓存</h2><h3 id="存在的问题"><a href="#存在的问题" class="headerlink" title="存在的问题"></a>存在的问题</h3><table>
+<thead>
+<tr>
+<th align="center">时间</th>
+<th align="center">线程A</th>
+<th align="center">线程B</th>
+<th align="center">存在的问题</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">T1</td>
+<td align="center">更新数据库中的值……</td>
+<td align="center"></td>
+<td align="center"></td>
+</tr>
+<tr>
+<td align="center">T2</td>
+<td align="center"></td>
+<td align="center">缓存立即命中，此时读取的是Redis中的旧值</td>
+<td align="center">A还没来得及删除缓存导致B读取的是旧值</td>
+</tr>
+<tr>
+<td align="center">T3</td>
+<td align="center">更新缓存数据</td>
+<td align="center"></td>
+<td align="center"></td>
+</tr>
+</tbody></table>
+<h3 id="小结-1"><a href="#小结-1" class="headerlink" title="小结"></a>小结</h3><p>先更新数据库，再删除缓存。假如删除缓存失败或来不及，将会导致<strong>再次访问Redis时缓存命中，访问的是旧值。</strong></p>
+<h3 id="解决方法"><a href="#解决方法" class="headerlink" title="解决方法"></a>解决方法</h3><p><img src="/../images/7-2.png"></p>
+<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><p><img src="/../images/7-3.png"></p>
+<p>通过分析以上四种双写策略我们不难发现，在实际生产中要做到实时一致性几乎不可能，我们所能做到的只是根据不同的业务场景选择最合适的双写策略来减少双写所带来的问题。</p>
+]]></content>
+      <tags>
+        <tag>Redis知识分享</tag>
       </tags>
   </entry>
   <entry>
