@@ -887,6 +887,96 @@
       </tags>
   </entry>
   <entry>
+    <title>Linux如何安装MySQL</title>
+    <url>/2024/76bb6795.html</url>
+    <content><![CDATA[<h1 id="Linux如何安装MySQL（MySQL-8-0）"><a href="#Linux如何安装MySQL（MySQL-8-0）" class="headerlink" title="Linux如何安装MySQL（MySQL 8.0）"></a>Linux如何安装MySQL（MySQL 8.0）</h1><h2 id="1-1-Linux系统及工具的准备"><a href="#1-1-Linux系统及工具的准备" class="headerlink" title="1.1 Linux系统及工具的准备"></a>1.1 Linux系统及工具的准备</h2><ul>
+<li>安装并启动虚拟机： CentOS 7</li>
+<li>掌握克隆虚拟机的操作</li>
+<li>mac地址 主机名</li>
+<li>ip地址</li>
+<li>UUID</li>
+<li>安装有 Xshell 和 Xftp 等访问CentOS系统的工具</li>
+<li>确保主机能联网</li>
+</ul>
+<h2 id="1-2-检查一下是否安装过MySQL"><a href="#1-2-检查一下是否安装过MySQL" class="headerlink" title="1.2 检查一下是否安装过MySQL"></a>1.2 检查一下是否安装过MySQL</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">rpm -qa | grep -i mysql  <span class="comment"># -i 忽略大小写 </span></span><br><span class="line">systemctl status mysqld.service</span><br></pre></td></tr></table></figure>
+
+<h2 id="1-3卸载MySQL"><a href="#1-3卸载MySQL" class="headerlink" title="1.3卸载MySQL"></a>1.3卸载MySQL</h2><p><strong>1.关闭 mysql 服务</strong></p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">systemctl stop mysqld.service</span><br></pre></td></tr></table></figure>
+
+<p><strong>2.查看当前 mysql 安装状况</strong></p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">rpm -qa | grep -i mysql </span><br><span class="line"></span><br><span class="line"><span class="comment"># 或 </span></span><br><span class="line"></span><br><span class="line">yum list installed | grep mysql</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p><strong>3.卸载上述命令查询出的已安装程序</strong></p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">yum remove mysql-xxx mysql-xxx mysql-xxx mysqk-xxxx</span><br></pre></td></tr></table></figure>
+
+<p><strong>务必卸载干净，反复执行 rpm -qa | grep -i mysql 确认是否有卸载残留</strong></p>
+<p><strong>4.删除 mysql 相关文件</strong></p>
+<p>查找相关文件 删除上述命令查找出的相关文件</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">find / -name mysql</span><br></pre></td></tr></table></figure>
+
+<p>删除命令</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">rm</span> -rf xxx</span><br></pre></td></tr></table></figure>
+
+<p><strong>5.删除 my.cnf</strong></p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">rm</span> -rf /etc/my.cnf</span><br></pre></td></tr></table></figure>
+
+<h2 id="1-4下载MySQL安装包"><a href="#1-4下载MySQL安装包" class="headerlink" title="1.4下载MySQL安装包"></a>1.4下载MySQL安装包</h2><p><strong>下载地址</strong></p>
+<p>官网：<a href="https://www.mysql.com/">https://www.mysql.com</a></p>
+<p><strong>安装包提取并上传</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql-community-common-8.0.25-1.el7.x86_64.rpm</span><br><span class="line">mysql-community-client-plugins-8.0.25-1.el7.x86_64.rpm</span><br><span class="line">mysql-community-libs-8.0.25-1.el7.x86_64.rpm</span><br><span class="line">mysql-community-client-8.0.25-1.el7.x86_64.rpm</span><br><span class="line">mysql-community-server-8.0.25-1.el7.x86_64.rpm</span><br></pre></td></tr></table></figure>
+
+<h2 id="1-5解决依赖并安装"><a href="#1-5解决依赖并安装" class="headerlink" title="1.5解决依赖并安装"></a>1.5解决依赖并安装</h2><p>在上面五个包所处的目录下<strong>按序</strong>执行以下命令</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">rpm -ivh mysql-community-common-8.0.25-1.el7.x86_64.rpm</span><br><span class="line">rpm -ivh mysql-community-client-plugins-8.0.25-1.el7.x86_64.rpm</span><br><span class="line">rpm -ivh mysql-community-libs-8.0.25-1.el7.x86_64.rpm</span><br><span class="line">rpm -ivh mysql-community-client-8.0.25-1.el7.x86_64.rpm</span><br><span class="line">rpm -ivh mysql-community-server-8.0.25-1.el7.x86_64.rpm</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><strong>rpm</strong> 是Redhat Package Manage缩写，通过RPM的管理，用户可以把源代码包装成以rpm为扩展名的 文件形式，易于安装。</li>
+<li><strong>-i</strong> , –install 安装软件包</li>
+<li><strong>-v</strong> , –verbose 提供更多的详细信息输出</li>
+<li><strong>-h</strong> , –hash 软件包安装的时候列出哈希标记 (和 -v 一起使用效果更好)，展示进度条</li>
+</ul>
+<p><strong>遇到的报错</strong></p>
+<p><img src="/../images/8-1.png"></p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">yum remove mysql-libs</span><br></pre></td></tr></table></figure>
+
+<h2 id="1-6查看MySQL的版本（检查是否安装成功）"><a href="#1-6查看MySQL的版本（检查是否安装成功）" class="headerlink" title="1.6查看MySQL的版本（检查是否安装成功）"></a>1.6查看MySQL的版本（检查是否安装成功）</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">mysql --version</span><br></pre></td></tr></table></figure>
+
+<h2 id="1-7服务初始化"><a href="#1-7服务初始化" class="headerlink" title="1.7服务初始化"></a>1.7服务初始化</h2><p>为了保证数据库目录与文件的所有者为 mysql 登录用户，如果你是以 root 身份运行 mysql 服务，需要执 行下面的命令初始化：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">mysqld --initialize --user=mysql</span><br></pre></td></tr></table></figure>
+
+<p>说明： –initialize 选项默认以“安全”模式来初始化，则会为 root 用户生成一个密码并将 该密码标记为过 期 ，登录后你需要设置一个新的密码。生成的 临时密码 会往日志中记录一份。 查看密码：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">cat</span> /var/log/mysqld.log</span><br></pre></td></tr></table></figure>
+
+<h2 id="1-8-启动MySQL"><a href="#1-8-启动MySQL" class="headerlink" title="1.8 启动MySQL"></a>1.8 启动MySQL</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">systemctl start mysqld.service</span><br></pre></td></tr></table></figure>
+
+<h2 id="1-9首次登录"><a href="#1-9首次登录" class="headerlink" title="1.9首次登录"></a>1.9首次登录</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">mysql -uroot -p</span><br></pre></td></tr></table></figure>
+
+<p>然后输入临时密码登录</p>
+<h2 id="1-10修改密码"><a href="#1-10修改密码" class="headerlink" title="1.10修改密码"></a>1.10修改密码</h2><p><strong>因为临时密码是会过期的，所以必须要修改密码，否则无法使用数据库</strong></p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">ALTER USER <span class="string">&#x27;root&#x27;</span>@<span class="string">&#x27;localhost&#x27;</span> IDENTIFIED BY <span class="string">&#x27;new_password&#x27;</span>; </span><br></pre></td></tr></table></figure>
+
+<p><strong>至此，MySQL成功安装</strong></p>
+<h1 id="远程连接登录MySQL"><a href="#远程连接登录MySQL" class="headerlink" title="远程连接登录MySQL"></a>远程连接登录MySQL</h1><p><strong>MySQL的默认配置是不支持远程连接的，</strong>所以如果我们想要使用一些sqlyog，DataGrip，Navicat等第三方连接工具，需要修改一些配置。</p>
+<h2 id="2-1-关闭防火墙"><a href="#2-1-关闭防火墙" class="headerlink" title="2.1 关闭防火墙"></a>2.1 关闭防火墙</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">systemctl stop firewalld //关闭防火墙</span><br><span class="line">systemctl disable firewalld.service //开机自动关闭</span><br></pre></td></tr></table></figure>
+
+<h2 id="2-2-登录MySQL，修改配置"><a href="#2-2-登录MySQL，修改配置" class="headerlink" title="2.2 登录MySQL，修改配置"></a>2.2 登录MySQL，修改配置</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">use mysql;</span><br><span class="line">update user set host = &#x27;%&#x27; where user =&#x27;root&#x27;;</span><br></pre></td></tr></table></figure>
+
+<p>Host列指定了允许用户登录所使用的IP，比如user&#x3D;root Host&#x3D;192.168.1.1。这里的意思就是说root用户只 能通过192.168.1.1的客户端去访问。 user&#x3D;root Host&#x3D;localhost，表示只能通过本机客户端去访问。而 %是个 通配符 ，如果Host&#x3D;192.168.1.%，那么就表示只要是IP地址前缀为“192.168.1.”的客户端都可以连 接。如果 Host&#x3D;% ，表示所有IP都有连接权限。 注意：在生产环境下不能为了省事将host设置为%，这样做会存在安全问题，具体的设置可以根据生产 环境的IP进行设置。Host设置了“%”后便可以允许远程访问。</p>
+<h2 id="2-3-刷新配置"><a href="#2-3-刷新配置" class="headerlink" title="2.3 刷新配置"></a>2.3 刷新配置</h2><p>修改完了配置之后需要刷新配置才能够生效</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">flush privileges;</span><br></pre></td></tr></table></figure>
+
+<h2 id="2-4-修改加密方法"><a href="#2-4-修改加密方法" class="headerlink" title="2.4 修改加密方法"></a>2.4 修改加密方法</h2><p>登录Linux的mysql库，执行这条命令</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">ALTER USER &#x27;root&#x27;@&#x27;%&#x27; IDENTIFIED WITH mysql_native_password BY &#x27;abc123&#x27;;</span><br></pre></td></tr></table></figure>
+
+<p><strong>至此，MySQL已经能够被远程连接访问了</strong></p>
+]]></content>
+      <categories>
+        <category>技术分享</category>
+      </categories>
+      <tags>
+        <tag>技术分享</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>友情链接</title>
     <url>/link/index.html</url>
     <content><![CDATA[]]></content>
