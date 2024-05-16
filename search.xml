@@ -1237,7 +1237,7 @@
       </tags>
   </entry>
   <entry>
-    <title>JVM运行时数据区(JAM内存模型)</title>
+    <title>JVM运行时数据区(JVM内存模型)</title>
     <url>/2024/a56b5c26.html</url>
     <content><![CDATA[<h1 id="JVM内存模型-运行时数据区"><a href="#JVM内存模型-运行时数据区" class="headerlink" title="JVM内存模型(运行时数据区)"></a>JVM内存模型(运行时数据区)</h1><p>本篇博客主要介绍JVM的内存模型分为哪些区，以及这些区各自在运行Java程序时起到什么作用。以及不同JDK版本中JVM内存模型有什么变化，其中<strong>方法区和堆</strong>是这篇博客重点介绍的地方。</p>
 <h2 id="JVM内存模型"><a href="#JVM内存模型" class="headerlink" title="JVM内存模型"></a>JVM内存模型</h2><p><img src="/../images/11-1.png"></p>
