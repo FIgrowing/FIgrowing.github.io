@@ -91,76 +91,6 @@
       </tags>
   </entry>
   <entry>
-    <title>Redis之缓存问题</title>
-    <url>/2023/efe9ee66.html</url>
-    <content><![CDATA[<h1 id="Redis中的缓存问题"><a href="#Redis中的缓存问题" class="headerlink" title="Redis中的缓存问题"></a>Redis中的缓存问题</h1><h2 id="Redis有哪些缓存问题？"><a href="#Redis有哪些缓存问题？" class="headerlink" title="Redis有哪些缓存问题？"></a>Redis有哪些缓存问题？</h2><ul>
-<li><strong>缓存预热：</strong>在服务上线之前我们可以提前将MySQL中的数据导入Redis中(可以利用@PostConstruct注解)</li>
-<li><strong>缓存雪崩：</strong>当Redis主机挂了，或者全盘崩溃，亦或者大面积的key在同一时间内失效，导致大量请求打到MySQL上</li>
-<li><strong>缓存穿透：</strong>请求去查询一条记录，当Redis中没有时，它会去MySQL中查询，结果发现也没用。这样就导致一些无效的非法不存在的数据一直打到MySQL上，给MySQL增加了不必要的压力，使Redis成了一个摆设</li>
-<li><strong>缓存击穿：</strong>大量请求查询一个热点key时，这个热点key恰好失效，导致这些请求打到MySQL上，令MySQL在短时间内压力倍增</li>
-</ul>
-<p>##如何预防和解决这些缓存问题</p>
-<h3 id="缓存预热"><a href="#缓存预热" class="headerlink" title="缓存预热"></a>缓存预热</h3><p>在服务上线之前我们可以提前将MySQL中的数据导入Redis中(可以利用@PostConstruct注解)</p>
-<h3 id="缓存雪崩"><a href="#缓存雪崩" class="headerlink" title="缓存雪崩"></a>缓存雪崩</h3><ul>
-<li><p>key直接设置为永不过期或者错开过期时间</p>
-</li>
-<li><p>Redis集群实现高可用(主从+哨兵；Redis Cluster；开启Redis持久化机制rdb&#x2F;aof，使之尽快回复Redis缓存)</p>
-</li>
-<li><p>多缓存结合预防雪崩(cache本地缓存+Redis缓存)</p>
-</li>
-<li><p>服务降级，使用Hystrix或者阿里sentinel降级，将阻止大量请求打到MySQL上，既是断开服务</p>
-</li>
-</ul>
-<h3 id="缓存穿透"><a href="#缓存穿透" class="headerlink" title="缓存穿透"></a>缓存穿透</h3><p><strong>隐患：</strong>既不在Redis，也不在MySQL，容易造成MySQL暴击，黑客也容易利用这点故意制造一些不存在的key频繁大量的攻击你的MySQL服务器，存在一定安全隐患</p>
-<h4 id="方案一"><a href="#方案一" class="headerlink" title="方案一"></a>方案一</h4><p>空对象缓存或者缺省。即，每当有不存在的key访问Redis和MySQL无果后，返回null给调用者，然后将这个key设置为null回写Redis，这样，下次这个key再被查询的时候就可以不用查询数据库了，就可以一定程度上缓解穿透问题。<strong>但是，该方案依然存在问题，黑客可以利用不同的不存在的非法key来攻击，这样一方面给你数据库增加不小压力，另一方面Redis会积累许多没用的key</strong></p>
-<h4 id="方案二"><a href="#方案二" class="headerlink" title="方案二"></a>方案二</h4><p>使用布隆过滤器，这里不做过多解释，以下是布隆过滤器结合Redis解决穿透的原理图，有兴趣的同学可以去自行了解。</p>
-<p><img src="/../images/5-1.png"></p>
-<h2 id="缓存击穿"><a href="#缓存击穿" class="headerlink" title="缓存击穿"></a>缓存击穿</h2><p><strong>方案一：</strong>设置差异失效时间，对于热点key，干脆不设置失效时间</p>
-<p><strong>方案二：</strong>采用双检加锁策略(多个线程同时去查询数据库的这条数据，那么我们可以在第一个查询数据的请求上使用一个 互斥锁来锁住它。其他的线程走到这一步拿不到锁就等着，等第一个线程查询到了数据，然后做缓存。后面的线程进来发现已经有缓存了，就直接走缓存)</p>
-<p><strong>方案三：</strong>使用双缓存机制。对于同一个数据设置两块缓存，主A从B。更新时先更新B，再删除并更新A；查询时，先查询A，如果A没有就查询B缓存。</p>
-<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><table>
-<thead>
-<tr>
-<th align="center">缓存问题</th>
-<th align="center">产生原因</th>
-<th align="center">解决方案</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="center">缓存更新方式</td>
-<td align="center">数据变更，缓存时效性</td>
-<td align="center">同步更新，失效更新，异步更新，定时更新</td>
-</tr>
-<tr>
-<td align="center">缓存不一致</td>
-<td align="center">同步更新失败、异步更新</td>
-<td align="center">增加重试、补偿任务、最终一致</td>
-</tr>
-<tr>
-<td align="center">缓存穿透</td>
-<td align="center">恶意攻击</td>
-<td align="center">空对象缓存，布隆过滤器</td>
-</tr>
-<tr>
-<td align="center">缓存击穿</td>
-<td align="center">热点key失效</td>
-<td align="center">双锁策略，双缓存互斥更新，差异失效时间</td>
-</tr>
-<tr>
-<td align="center">缓存雪崩</td>
-<td align="center">缓存挂掉</td>
-<td align="center">服务降级熔断，高可用集群</td>
-</tr>
-</tbody></table>
-]]></content>
-      <categories>
-        <category>Redis</category>
-      </categories>
-      <tags>
-        <tag>Redis知识分享</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>JVM运行时数据区(JVM内存模型)</title>
     <url>/2024/a56b5c26.html</url>
     <content><![CDATA[<h1 id="JVM内存模型-运行时数据区"><a href="#JVM内存模型-运行时数据区" class="headerlink" title="JVM内存模型(运行时数据区)"></a>JVM内存模型(运行时数据区)</h1><p>本篇博客主要介绍JVM的内存模型分为哪些区，以及这些区各自在运行Java程序时起到什么作用。以及不同JDK版本中JVM内存模型有什么变化，其中<strong>方法区和堆</strong>是这篇博客重点介绍的地方。</p>
@@ -328,6 +258,263 @@
       </categories>
       <tags>
         <tag>JVM</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Redis之缓存问题</title>
+    <url>/2023/efe9ee66.html</url>
+    <content><![CDATA[<h1 id="Redis中的缓存问题"><a href="#Redis中的缓存问题" class="headerlink" title="Redis中的缓存问题"></a>Redis中的缓存问题</h1><h2 id="Redis有哪些缓存问题？"><a href="#Redis有哪些缓存问题？" class="headerlink" title="Redis有哪些缓存问题？"></a>Redis有哪些缓存问题？</h2><ul>
+<li><strong>缓存预热：</strong>在服务上线之前我们可以提前将MySQL中的数据导入Redis中(可以利用@PostConstruct注解)</li>
+<li><strong>缓存雪崩：</strong>当Redis主机挂了，或者全盘崩溃，亦或者大面积的key在同一时间内失效，导致大量请求打到MySQL上</li>
+<li><strong>缓存穿透：</strong>请求去查询一条记录，当Redis中没有时，它会去MySQL中查询，结果发现也没用。这样就导致一些无效的非法不存在的数据一直打到MySQL上，给MySQL增加了不必要的压力，使Redis成了一个摆设</li>
+<li><strong>缓存击穿：</strong>大量请求查询一个热点key时，这个热点key恰好失效，导致这些请求打到MySQL上，令MySQL在短时间内压力倍增</li>
+</ul>
+<p>##如何预防和解决这些缓存问题</p>
+<h3 id="缓存预热"><a href="#缓存预热" class="headerlink" title="缓存预热"></a>缓存预热</h3><p>在服务上线之前我们可以提前将MySQL中的数据导入Redis中(可以利用@PostConstruct注解)</p>
+<h3 id="缓存雪崩"><a href="#缓存雪崩" class="headerlink" title="缓存雪崩"></a>缓存雪崩</h3><ul>
+<li><p>key直接设置为永不过期或者错开过期时间</p>
+</li>
+<li><p>Redis集群实现高可用(主从+哨兵；Redis Cluster；开启Redis持久化机制rdb&#x2F;aof，使之尽快回复Redis缓存)</p>
+</li>
+<li><p>多缓存结合预防雪崩(cache本地缓存+Redis缓存)</p>
+</li>
+<li><p>服务降级，使用Hystrix或者阿里sentinel降级，将阻止大量请求打到MySQL上，既是断开服务</p>
+</li>
+</ul>
+<h3 id="缓存穿透"><a href="#缓存穿透" class="headerlink" title="缓存穿透"></a>缓存穿透</h3><p><strong>隐患：</strong>既不在Redis，也不在MySQL，容易造成MySQL暴击，黑客也容易利用这点故意制造一些不存在的key频繁大量的攻击你的MySQL服务器，存在一定安全隐患</p>
+<h4 id="方案一"><a href="#方案一" class="headerlink" title="方案一"></a>方案一</h4><p>空对象缓存或者缺省。即，每当有不存在的key访问Redis和MySQL无果后，返回null给调用者，然后将这个key设置为null回写Redis，这样，下次这个key再被查询的时候就可以不用查询数据库了，就可以一定程度上缓解穿透问题。<strong>但是，该方案依然存在问题，黑客可以利用不同的不存在的非法key来攻击，这样一方面给你数据库增加不小压力，另一方面Redis会积累许多没用的key</strong></p>
+<h4 id="方案二"><a href="#方案二" class="headerlink" title="方案二"></a>方案二</h4><p>使用布隆过滤器，这里不做过多解释，以下是布隆过滤器结合Redis解决穿透的原理图，有兴趣的同学可以去自行了解。</p>
+<p><img src="/../images/5-1.png"></p>
+<h2 id="缓存击穿"><a href="#缓存击穿" class="headerlink" title="缓存击穿"></a>缓存击穿</h2><p><strong>方案一：</strong>设置差异失效时间，对于热点key，干脆不设置失效时间</p>
+<p><strong>方案二：</strong>采用双检加锁策略(多个线程同时去查询数据库的这条数据，那么我们可以在第一个查询数据的请求上使用一个 互斥锁来锁住它。其他的线程走到这一步拿不到锁就等着，等第一个线程查询到了数据，然后做缓存。后面的线程进来发现已经有缓存了，就直接走缓存)</p>
+<p><strong>方案三：</strong>使用双缓存机制。对于同一个数据设置两块缓存，主A从B。更新时先更新B，再删除并更新A；查询时，先查询A，如果A没有就查询B缓存。</p>
+<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><table>
+<thead>
+<tr>
+<th align="center">缓存问题</th>
+<th align="center">产生原因</th>
+<th align="center">解决方案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">缓存更新方式</td>
+<td align="center">数据变更，缓存时效性</td>
+<td align="center">同步更新，失效更新，异步更新，定时更新</td>
+</tr>
+<tr>
+<td align="center">缓存不一致</td>
+<td align="center">同步更新失败、异步更新</td>
+<td align="center">增加重试、补偿任务、最终一致</td>
+</tr>
+<tr>
+<td align="center">缓存穿透</td>
+<td align="center">恶意攻击</td>
+<td align="center">空对象缓存，布隆过滤器</td>
+</tr>
+<tr>
+<td align="center">缓存击穿</td>
+<td align="center">热点key失效</td>
+<td align="center">双锁策略，双缓存互斥更新，差异失效时间</td>
+</tr>
+<tr>
+<td align="center">缓存雪崩</td>
+<td align="center">缓存挂掉</td>
+<td align="center">服务降级熔断，高可用集群</td>
+</tr>
+</tbody></table>
+]]></content>
+      <categories>
+        <category>Redis</category>
+      </categories>
+      <tags>
+        <tag>Redis知识分享</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>MVCC机制及其原理</title>
+    <url>/2023/55c34784.html</url>
+    <content><![CDATA[<p>helllo！大家好，今天主要给大家分享一篇有关MySQL中可重复读隔离级别的实现原理，废话不多说，我们直接进入正题！</p>
+<h1 id="四大隔离级别与MVCC机制"><a href="#四大隔离级别与MVCC机制" class="headerlink" title="四大隔离级别与MVCC机制"></a>四大隔离级别与MVCC机制</h1><p>在介绍可重复读的实现原理之前我们有必要先来了解一下四大隔离级别与MVCC机制的实现原理</p>
+<h2 id="一-四大隔离级别"><a href="#一-四大隔离级别" class="headerlink" title="一.四大隔离级别"></a>一.四大隔离级别</h2><ul>
+<li><font color="red">READ UNCOMMITTED</font>:读未提交，在该隔离级别下，所有事务都可以看到其他事务未提交的数据。不能避免脏读，不可重复读和幻读。</li>
+<li><font color="red">READ COMMITTED</font>:读已提交，在该隔离级别下，一个事务只能看见其他事务已经提交的改变。可以避免脏读，但是依然存在不可重复读和幻读问题。</li>
+<li><font color="red">REPEATABLE READ</font>:可重复读，当一个事务正在读取数据时，其他事务对该数据的修改对当前事务是不可见的。解决了不可重复读，也是MySQL的默认隔离级别，但依旧存在幻读问题。</li>
+<li><font color="red">SERIALIZABLE</font>:可串行化，确保事务可以从一个表中读取相同的行。在这个事务持续期间，禁止 其他事务对该表执行插入、更新和删除操作。所有的并发问题都可以避免，但性能十分低下。能避 免脏读、不可重复读和幻读</li>
+</ul>
+<h2 id="二-MVCC"><a href="#二-MVCC" class="headerlink" title="二.MVCC"></a>二.MVCC</h2><h3 id="什么是MVCC机制呢？"><a href="#什么是MVCC机制呢？" class="headerlink" title="什么是MVCC机制呢？"></a>什么是MVCC机制呢？</h3><p>MVCC （Multiversion Concurrency Control），即多版本并发控制。顾名思义，是通过数据行的多个版本管理来实现数据库的并发控制。讲人话就是，每个事务都是在对数据行不同的版本进行操作，实现了数据一致性读的。</p>
+<h3 id="MVCC的实现原理"><a href="#MVCC的实现原理" class="headerlink" title="MVCC的实现原理"></a>MVCC的实现原理</h3><h4 id="1-隐藏字段和Undo-Log版本链"><a href="#1-隐藏字段和Undo-Log版本链" class="headerlink" title="1.隐藏字段和Undo Log版本链"></a>1.隐藏字段和Undo Log版本链</h4><p>对InnoDB数据存储结构了解的朋友来说，想必对于trx_id和roll-pointer这两条隐藏列应该不陌生，这里再做一下解释</p>
+<ul>
+<li><p><strong>trx-id</strong>:每次对某一条聚簇索引改动时都会把该事务的id赋值给trx_id</p>
+</li>
+<li><p><strong>roll-pointer</strong>:每次对聚簇索引进行改变时，都会把旧版本写入undo日志中，而roll_pointer类似一个指针指向修改之前的那个旧版本，这样就可以通过该隐藏列修改之前的数据</p>
+<p><img src="/../images/1-1.png"></p>
+<p><strong>假如有两条id分别为10，20的事务对该条数据进行update操作</strong></p>
+<table>
+<thead>
+<tr>
+<th align="left">顺序</th>
+<th>事务10</th>
+<th>事务20</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">1</td>
+<td>begin;</td>
+<td></td>
+</tr>
+<tr>
+<td align="left">2</td>
+<td></td>
+<td>begin</td>
+</tr>
+<tr>
+<td align="left">3</td>
+<td>update set name&#x3D;”李四” where id &#x3D;1;</td>
+<td></td>
+</tr>
+<tr>
+<td align="left">4</td>
+<td>update set name&#x3D;”王五” where id &#x3D;1;</td>
+<td></td>
+</tr>
+<tr>
+<td align="left">5</td>
+<td>commit;</td>
+<td></td>
+</tr>
+<tr>
+<td align="left">6</td>
+<td></td>
+<td>update set name&#x3D;”钱七” where id &#x3D;1;</td>
+</tr>
+<tr>
+<td align="left">7</td>
+<td></td>
+<td>update set name&#x3D;”宋八” where id &#x3D;1;</td>
+</tr>
+<tr>
+<td align="left">8</td>
+<td></td>
+<td>commit;</td>
+</tr>
+</tbody></table>
+<hr>
+</li>
+</ul>
+<p><strong><font color="brown">其对应的undolog版本链如下：</font></strong></p>
+<p><img src="/../images/1-2.png"></p>
+<h4 id="2-ReadView"><a href="#2-ReadView" class="headerlink" title="2.ReadView"></a>2.ReadView</h4><h6 id="2-1-什么是ReadView？为什么要引入ReadView？"><a href="#2-1-什么是ReadView？为什么要引入ReadView？" class="headerlink" title="2.1 什么是ReadView？为什么要引入ReadView？"></a>2.1 什么是ReadView？为什么要引入ReadView？</h6><p>ReadView其实就是一个事务开启时对某条记录进行操作时生成的版本快照。</p>
+<ul>
+<li>使用 READ UNCOMMITTED 隔离级别的事务，由于可以读到未提交事务修改过的记录，所以直接读取记录的最新版本就好了。</li>
+<li>使用 SERIALIZABLE 隔离级别的事务，InnoDB规定使用加锁的方式来访问记录。</li>
+<li>使用 READ COMMITTED 和 REPEATABLE READ 隔离级别的事务，都必须保证读到 已经提交了的 事务修改 过的记录。假如另一个事务已经修改了记录但是尚未提交，是不能直接读取最新版本的记录的。</li>
+</ul>
+<p><strong>核心问题就是需要判断一下版本链中的哪个版本是当前事务可见的，这是ReadView要解决的主要问题。</strong></p>
+<h6 id="2-2-ReadView的主要组成部分"><a href="#2-2-ReadView的主要组成部分" class="headerlink" title="2.2 ReadView的主要组成部分"></a>2.2 ReadView的主要组成部分</h6><ul>
+<li><strong>creator-trx-id</strong>:创建这个 Read View 的事务 ID。</li>
+<li><strong>trx-ids</strong>:表示当前系统中活跃的事务的id列表</li>
+<li><strong>min-trx-id</strong>:表示当前活跃事务列表中最小的事务id</li>
+<li><strong>max-trx-id</strong>:表示生成ReadView时系统中应该分配给下一个事务的 id 值（这里需要注意的是，max-trx-id是指的系统中的最大事务id之后应该分配的id，有别于最大活跃事务id）</li>
+</ul>
+<h5 id="2-3-ReadView的应用规则"><a href="#2-3-ReadView的应用规则" class="headerlink" title="2.3 ReadView的应用规则"></a>2.3 ReadView的应用规则</h5><p>有了这个ReadView就可以根据以下规则判断当前版本信息是否可见</p>
+<ul>
+<li><p>如果当前被访问版本的trx_id与当前ReadView的creator-trx-id相同，那就意味着当前事务正在访问它之前修改过的数据，所以该版本的数据对于当前事务来说是可见的</p>
+</li>
+<li><p>如果当前被访问版本的trx_id小于ReadView中的min-trx-id:，那就意味着生成该ReadView版本的事务在当前版本生成ReadView之前就已经提交了，所以该条记录对于当前事务来说是可见的</p>
+</li>
+<li><p>如果当前被访问版本的trx_id大于或等于max-trx-id:，那就意味着生成该版本的事务是在当前版本生成ReadView之后才开启的，所以版本数据对于当前事务来说是不可见的</p>
+</li>
+<li><p>如果当前被访问版本的ReadView的trx_id在min-trx-id和max-trx-id之间的话，那就要判断一下trx_id在不在trx_ids列表中，此时存在两种情况</p>
+<p><em><strong>第一种情况：</strong></em> ReadView的trx_id<strong>在</strong>min-trx-id和max-trx-id之间，那么生成该版本的事务还未提交，因此，对于当前事务来说该版本的记录是不可见的 </p>
+<p><em><strong>第二种情况：</strong></em> ReadView的trx_id<strong>不在</strong>min-trx-id和max-trx-id之间，那么就意味着生成该ReadView版本的事务已经提交，该版本的记录对于当前事务来说是可见的</p>
+</li>
+</ul>
+<h5 id="2-4-思考题"><a href="#2-4-思考题" class="headerlink" title="2.4 思考题"></a>2.4 思考题</h5><p>不知道看到这里的朋友有没有思考过这样一个问题，如下：<br>现在有两个活跃的事务A,B他们的id分别是10和20，当A查询了某条记录后，B对该记录做了修改，并且B提交了事务，<br>此时，该记录的ReadView的trx_id应该为20，此时A事务再去对该记录进行查询操作，这时候A会发现这条记录的ReadView为20既比自己的10大，又比max_trx_id（21）小，且不在trx_ids里面，根据上面提到的ReadView应用规则，A事务是可以去读取这条记录的，那这不违反了可重复读的隔离机制了吗？别急，接下来我们就来讲讲MVCC机制是如何来实现隔离级别的。</p>
+<h2 id="三-MVCC机制如何保证隔离级别的实现"><a href="#三-MVCC机制如何保证隔离级别的实现" class="headerlink" title="三.MVCC机制如何保证隔离级别的实现"></a>三.MVCC机制如何保证隔离级别的实现</h2><p>想必能看到这里的朋友们对MVCC的原理已经有了基本的了解，那么接下来我们就来看看MVCC机制如何保证隔离级别的实现，由于READ UNCOMMITTED 隔离级别的事务是当前读，SERIALIZABLE 隔离级别的事务是基于锁实现的，所以，我们在这里主要讨论<strong>读已提交和可重复读</strong>。</p>
+<h3 id="3-1-MVCC的整体操作流程"><a href="#3-1-MVCC的整体操作流程" class="headerlink" title="3.1 MVCC的整体操作流程"></a>3.1 MVCC的整体操作流程</h3><ol>
+<li>首先获取事务自己的版本号，也就是事务id</li>
+<li>然后获取ReadView</li>
+<li>将自己的事务id与ReadView的trx_id进行比较</li>
+<li>如果不符合ReadView的规则，那么就从Undo Log中获取历史快照</li>
+<li>最后返回符合规则的数据</li>
+</ol>
+<h3 id="3-2-在隔离级别为读已提交时"><a href="#3-2-在隔离级别为读已提交时" class="headerlink" title="3.2 在隔离级别为读已提交时"></a>3.2 在隔离级别为读已提交时</h3><p>在隔离级别为读已提交时，每一次执行select语句，每次都会重新获取一次最新的ReadView</p>
+<table>
+<thead>
+<tr>
+<th align="center">事务</th>
+<th align="center">ReadView获取情况</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">begin；</td>
+<td align="center"></td>
+</tr>
+<tr>
+<td align="center">select * from student where id &#x3D;1;</td>
+<td align="center">获取一次ReanView</td>
+</tr>
+<tr>
+<td align="center">…….</td>
+<td align="center"></td>
+</tr>
+<tr>
+<td align="center">select * from student where id &#x3D;1;</td>
+<td align="center">获取一次ReanView</td>
+</tr>
+<tr>
+<td align="center">commit</td>
+<td align="center"></td>
+</tr>
+</tbody></table>
+<h3 id="3-3-在隔离级别为可重复读时"><a href="#3-3-在隔离级别为可重复读时" class="headerlink" title="3.3 在隔离级别为可重复读时"></a>3.3 在隔离级别为可重复读时</h3><p>在隔离级别为可重复读时，事务开启后只有在第一次select语句后才会获取ReadView，之后的select都是沿用这个ReadView，并不会再去获取新的ReadView</p>
+<p><img src="/../images/1-3.png"></p>
+<h3 id="3-4-解释2-4思考题"><a href="#3-4-解释2-4思考题" class="headerlink" title="3.4 解释2.4思考题"></a>3.4 解释2.4思考题</h3><p>从以上在两种不同隔离机制下对MVCC的讲解不难看出，由于使用的隔离级别是可重复读的隔离级别，因此，从A事务开始并第一次执行select语句时，就产生了一个ReanView，此后A事务对该条数据进行的查询语句都是基于该版本的记录进行查询，因此B事务对该条数据的操作对A来说是不可见的。</p>
+<h3 id="3-5-如何解决幻读"><a href="#3-5-如何解决幻读" class="headerlink" title="3.5 如何解决幻读"></a>3.5 如何解决幻读</h3><p>假设现在student表中有如下所示的一条数据：</p>
+<table>
+<thead>
+<tr>
+<th>trx_id&#x3D;10</th>
+<th>数据<br />id&#x3D;1,name&#x3D;”张三”，age&#x3D;18</th>
+<th>roll_pointer&#x3D;null</th>
+</tr>
+</thead>
+</table>
+<p>现有两个事务A，B，他们的id分别是20和30</p>
+<p><strong>步骤一：</strong>事务A首先执行查询语句：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">select * from student where id &gt;=1; </span><br></pre></td></tr></table></figure>
+
+<p>在开始查询前ReadView的情况如下：trx_ids&#x3D;[20,30]，min_trx_id&#x3D;20 , max_trx_id&#x3D;31 , creator_trx_id&#x3D;20。由于<strong>trx_id&lt;min_tex_id</strong>,所以该条数据对于事务A可见</p>
+<p><strong>步骤二：</strong>事务B往表中插入两条数据，并提交事务。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">insert into student(id,name,age) values(2,&#x27;李四&#x27;,12);</span><br><span class="line">insert into student(id,name,age) values(3,&#x27;王五&#x27;,16); </span><br></pre></td></tr></table></figure>
+
+<p><strong>步骤三：</strong>接着事务 A 开启第二次查询，根据可重复读隔离级别的规则，此时事务 A 并不会再重新生成ReadView。此时表 student 中的 3 条数据都满足 where id&gt;&#x3D;1 的条件，因此会先查出来。然后根据ReadView 机制，判断每条数据是不是都可以被事务 A 看到。</p>
+<p><strong><font  color="red">分析如下</font></strong>:</p>
+<ul>
+<li><p>对于id&#x3D;1的记录，由于第一次和第二次查询使用的是同一个ReadView，所以该条数据能够被查询出来</p>
+</li>
+<li><p>对于id&#x3D;2和id&#x3D;3的记录，其实无论B事务提不提交对于A来说B的操作都是不可见的，理由如下：</p>
+</li>
+<li><p>如果B没有提交事务那么根据上面ReadView使用规则的第四条可以判断B事务新增的记录不可见</p>
+</li>
+<li><p>如果B提交了事务，此时trx_ids&#x3D;[20]，min_trx_id&#x3D;20，那么根据上面ReadView使用规则的第三条也可以判断这两条记录对于A来说不可见</p>
+</li>
+</ul>
+<h1 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h1><p>本文主要讲解了一下几点：</p>
+<ul>
+<li><a href="#%E4%B8%80.%E5%9B%9B%E5%A4%A7%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB">四大隔离级别</a></li>
+<li><a href="#%E4%BA%8C.MVCC">MVCC机制及其实现原理</a></li>
+<li><a href="#%E4%B8%89.MVCC%E6%9C%BA%E5%88%B6%E5%A6%82%E4%BD%95%E4%BF%9D%E8%AF%81%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E7%9A%84%E5%AE%9E%E7%8E%B0">MVCC机制如何保证读已提交和可重复读的实现</a></li>
+<li>[ReadView的应用规则](#2.3 ReadView的应用规则)</li>
+<li>[MVCC如何解决幻读](#3.5 如何解决幻读)</li>
+</ul>
+<p>希望这篇文章能够让你对MVCC有更好的了解<img src="https://dl4.weshineapp.com/gif/20170714/776d24c1ce2b76a37367b886699a25f0.gif?f=micro_5byA5b+D" alt="img"></p>
+]]></content>
+      <categories>
+        <category>MySQL</category>
+      </categories>
+      <tags>
+        <tag>MySQL技术分享</tag>
       </tags>
   </entry>
   <entry>
@@ -606,303 +793,6 @@
       </tags>
   </entry>
   <entry>
-    <title>MVCC机制及其原理</title>
-    <url>/2023/55c34784.html</url>
-    <content><![CDATA[<p>helllo！大家好，今天主要给大家分享一篇有关MySQL中可重复读隔离级别的实现原理，废话不多说，我们直接进入正题！</p>
-<h1 id="四大隔离级别与MVCC机制"><a href="#四大隔离级别与MVCC机制" class="headerlink" title="四大隔离级别与MVCC机制"></a>四大隔离级别与MVCC机制</h1><p>在介绍可重复读的实现原理之前我们有必要先来了解一下四大隔离级别与MVCC机制的实现原理</p>
-<h2 id="一-四大隔离级别"><a href="#一-四大隔离级别" class="headerlink" title="一.四大隔离级别"></a>一.四大隔离级别</h2><ul>
-<li><font color="red">READ UNCOMMITTED</font>:读未提交，在该隔离级别下，所有事务都可以看到其他事务未提交的数据。不能避免脏读，不可重复读和幻读。</li>
-<li><font color="red">READ COMMITTED</font>:读已提交，在该隔离级别下，一个事务只能看见其他事务已经提交的改变。可以避免脏读，但是依然存在不可重复读和幻读问题。</li>
-<li><font color="red">REPEATABLE READ</font>:可重复读，当一个事务正在读取数据时，其他事务对该数据的修改对当前事务是不可见的。解决了不可重复读，也是MySQL的默认隔离级别，但依旧存在幻读问题。</li>
-<li><font color="red">SERIALIZABLE</font>:可串行化，确保事务可以从一个表中读取相同的行。在这个事务持续期间，禁止 其他事务对该表执行插入、更新和删除操作。所有的并发问题都可以避免，但性能十分低下。能避 免脏读、不可重复读和幻读</li>
-</ul>
-<h2 id="二-MVCC"><a href="#二-MVCC" class="headerlink" title="二.MVCC"></a>二.MVCC</h2><h3 id="什么是MVCC机制呢？"><a href="#什么是MVCC机制呢？" class="headerlink" title="什么是MVCC机制呢？"></a>什么是MVCC机制呢？</h3><p>MVCC （Multiversion Concurrency Control），即多版本并发控制。顾名思义，是通过数据行的多个版本管理来实现数据库的并发控制。讲人话就是，每个事务都是在对数据行不同的版本进行操作，实现了数据一致性读的。</p>
-<h3 id="MVCC的实现原理"><a href="#MVCC的实现原理" class="headerlink" title="MVCC的实现原理"></a>MVCC的实现原理</h3><h4 id="1-隐藏字段和Undo-Log版本链"><a href="#1-隐藏字段和Undo-Log版本链" class="headerlink" title="1.隐藏字段和Undo Log版本链"></a>1.隐藏字段和Undo Log版本链</h4><p>对InnoDB数据存储结构了解的朋友来说，想必对于trx_id和roll-pointer这两条隐藏列应该不陌生，这里再做一下解释</p>
-<ul>
-<li><p><strong>trx-id</strong>:每次对某一条聚簇索引改动时都会把该事务的id赋值给trx_id</p>
-</li>
-<li><p><strong>roll-pointer</strong>:每次对聚簇索引进行改变时，都会把旧版本写入undo日志中，而roll_pointer类似一个指针指向修改之前的那个旧版本，这样就可以通过该隐藏列修改之前的数据</p>
-<p><img src="/../images/1-1.png"></p>
-<p><strong>假如有两条id分别为10，20的事务对该条数据进行update操作</strong></p>
-<table>
-<thead>
-<tr>
-<th align="left">顺序</th>
-<th>事务10</th>
-<th>事务20</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">1</td>
-<td>begin;</td>
-<td></td>
-</tr>
-<tr>
-<td align="left">2</td>
-<td></td>
-<td>begin</td>
-</tr>
-<tr>
-<td align="left">3</td>
-<td>update set name&#x3D;”李四” where id &#x3D;1;</td>
-<td></td>
-</tr>
-<tr>
-<td align="left">4</td>
-<td>update set name&#x3D;”王五” where id &#x3D;1;</td>
-<td></td>
-</tr>
-<tr>
-<td align="left">5</td>
-<td>commit;</td>
-<td></td>
-</tr>
-<tr>
-<td align="left">6</td>
-<td></td>
-<td>update set name&#x3D;”钱七” where id &#x3D;1;</td>
-</tr>
-<tr>
-<td align="left">7</td>
-<td></td>
-<td>update set name&#x3D;”宋八” where id &#x3D;1;</td>
-</tr>
-<tr>
-<td align="left">8</td>
-<td></td>
-<td>commit;</td>
-</tr>
-</tbody></table>
-<hr>
-</li>
-</ul>
-<p><strong><font color="brown">其对应的undolog版本链如下：</font></strong></p>
-<p><img src="/../images/1-2.png"></p>
-<h4 id="2-ReadView"><a href="#2-ReadView" class="headerlink" title="2.ReadView"></a>2.ReadView</h4><h6 id="2-1-什么是ReadView？为什么要引入ReadView？"><a href="#2-1-什么是ReadView？为什么要引入ReadView？" class="headerlink" title="2.1 什么是ReadView？为什么要引入ReadView？"></a>2.1 什么是ReadView？为什么要引入ReadView？</h6><p>ReadView其实就是一个事务开启时对某条记录进行操作时生成的版本快照。</p>
-<ul>
-<li>使用 READ UNCOMMITTED 隔离级别的事务，由于可以读到未提交事务修改过的记录，所以直接读取记录的最新版本就好了。</li>
-<li>使用 SERIALIZABLE 隔离级别的事务，InnoDB规定使用加锁的方式来访问记录。</li>
-<li>使用 READ COMMITTED 和 REPEATABLE READ 隔离级别的事务，都必须保证读到 已经提交了的 事务修改 过的记录。假如另一个事务已经修改了记录但是尚未提交，是不能直接读取最新版本的记录的。</li>
-</ul>
-<p><strong>核心问题就是需要判断一下版本链中的哪个版本是当前事务可见的，这是ReadView要解决的主要问题。</strong></p>
-<h6 id="2-2-ReadView的主要组成部分"><a href="#2-2-ReadView的主要组成部分" class="headerlink" title="2.2 ReadView的主要组成部分"></a>2.2 ReadView的主要组成部分</h6><ul>
-<li><strong>creator-trx-id</strong>:创建这个 Read View 的事务 ID。</li>
-<li><strong>trx-ids</strong>:表示当前系统中活跃的事务的id列表</li>
-<li><strong>min-trx-id</strong>:表示当前活跃事务列表中最小的事务id</li>
-<li><strong>max-trx-id</strong>:表示生成ReadView时系统中应该分配给下一个事务的 id 值（这里需要注意的是，max-trx-id是指的系统中的最大事务id之后应该分配的id，有别于最大活跃事务id）</li>
-</ul>
-<h5 id="2-3-ReadView的应用规则"><a href="#2-3-ReadView的应用规则" class="headerlink" title="2.3 ReadView的应用规则"></a>2.3 ReadView的应用规则</h5><p>有了这个ReadView就可以根据以下规则判断当前版本信息是否可见</p>
-<ul>
-<li><p>如果当前被访问版本的trx_id与当前ReadView的creator-trx-id相同，那就意味着当前事务正在访问它之前修改过的数据，所以该版本的数据对于当前事务来说是可见的</p>
-</li>
-<li><p>如果当前被访问版本的trx_id小于ReadView中的min-trx-id:，那就意味着生成该ReadView版本的事务在当前版本生成ReadView之前就已经提交了，所以该条记录对于当前事务来说是可见的</p>
-</li>
-<li><p>如果当前被访问版本的trx_id大于或等于max-trx-id:，那就意味着生成该版本的事务是在当前版本生成ReadView之后才开启的，所以版本数据对于当前事务来说是不可见的</p>
-</li>
-<li><p>如果当前被访问版本的ReadView的trx_id在min-trx-id和max-trx-id之间的话，那就要判断一下trx_id在不在trx_ids列表中，此时存在两种情况</p>
-<p><em><strong>第一种情况：</strong></em> ReadView的trx_id<strong>在</strong>min-trx-id和max-trx-id之间，那么生成该版本的事务还未提交，因此，对于当前事务来说该版本的记录是不可见的 </p>
-<p><em><strong>第二种情况：</strong></em> ReadView的trx_id<strong>不在</strong>min-trx-id和max-trx-id之间，那么就意味着生成该ReadView版本的事务已经提交，该版本的记录对于当前事务来说是可见的</p>
-</li>
-</ul>
-<h5 id="2-4-思考题"><a href="#2-4-思考题" class="headerlink" title="2.4 思考题"></a>2.4 思考题</h5><p>不知道看到这里的朋友有没有思考过这样一个问题，如下：<br>现在有两个活跃的事务A,B他们的id分别是10和20，当A查询了某条记录后，B对该记录做了修改，并且B提交了事务，<br>此时，该记录的ReadView的trx_id应该为20，此时A事务再去对该记录进行查询操作，这时候A会发现这条记录的ReadView为20既比自己的10大，又比max_trx_id（21）小，且不在trx_ids里面，根据上面提到的ReadView应用规则，A事务是可以去读取这条记录的，那这不违反了可重复读的隔离机制了吗？别急，接下来我们就来讲讲MVCC机制是如何来实现隔离级别的。</p>
-<h2 id="三-MVCC机制如何保证隔离级别的实现"><a href="#三-MVCC机制如何保证隔离级别的实现" class="headerlink" title="三.MVCC机制如何保证隔离级别的实现"></a>三.MVCC机制如何保证隔离级别的实现</h2><p>想必能看到这里的朋友们对MVCC的原理已经有了基本的了解，那么接下来我们就来看看MVCC机制如何保证隔离级别的实现，由于READ UNCOMMITTED 隔离级别的事务是当前读，SERIALIZABLE 隔离级别的事务是基于锁实现的，所以，我们在这里主要讨论<strong>读已提交和可重复读</strong>。</p>
-<h3 id="3-1-MVCC的整体操作流程"><a href="#3-1-MVCC的整体操作流程" class="headerlink" title="3.1 MVCC的整体操作流程"></a>3.1 MVCC的整体操作流程</h3><ol>
-<li>首先获取事务自己的版本号，也就是事务id</li>
-<li>然后获取ReadView</li>
-<li>将自己的事务id与ReadView的trx_id进行比较</li>
-<li>如果不符合ReadView的规则，那么就从Undo Log中获取历史快照</li>
-<li>最后返回符合规则的数据</li>
-</ol>
-<h3 id="3-2-在隔离级别为读已提交时"><a href="#3-2-在隔离级别为读已提交时" class="headerlink" title="3.2 在隔离级别为读已提交时"></a>3.2 在隔离级别为读已提交时</h3><p>在隔离级别为读已提交时，每一次执行select语句，每次都会重新获取一次最新的ReadView</p>
-<table>
-<thead>
-<tr>
-<th align="center">事务</th>
-<th align="center">ReadView获取情况</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="center">begin；</td>
-<td align="center"></td>
-</tr>
-<tr>
-<td align="center">select * from student where id &#x3D;1;</td>
-<td align="center">获取一次ReanView</td>
-</tr>
-<tr>
-<td align="center">…….</td>
-<td align="center"></td>
-</tr>
-<tr>
-<td align="center">select * from student where id &#x3D;1;</td>
-<td align="center">获取一次ReanView</td>
-</tr>
-<tr>
-<td align="center">commit</td>
-<td align="center"></td>
-</tr>
-</tbody></table>
-<h3 id="3-3-在隔离级别为可重复读时"><a href="#3-3-在隔离级别为可重复读时" class="headerlink" title="3.3 在隔离级别为可重复读时"></a>3.3 在隔离级别为可重复读时</h3><p>在隔离级别为可重复读时，事务开启后只有在第一次select语句后才会获取ReadView，之后的select都是沿用这个ReadView，并不会再去获取新的ReadView</p>
-<p><img src="/../images/1-3.png"></p>
-<h3 id="3-4-解释2-4思考题"><a href="#3-4-解释2-4思考题" class="headerlink" title="3.4 解释2.4思考题"></a>3.4 解释2.4思考题</h3><p>从以上在两种不同隔离机制下对MVCC的讲解不难看出，由于使用的隔离级别是可重复读的隔离级别，因此，从A事务开始并第一次执行select语句时，就产生了一个ReanView，此后A事务对该条数据进行的查询语句都是基于该版本的记录进行查询，因此B事务对该条数据的操作对A来说是不可见的。</p>
-<h3 id="3-5-如何解决幻读"><a href="#3-5-如何解决幻读" class="headerlink" title="3.5 如何解决幻读"></a>3.5 如何解决幻读</h3><p>假设现在student表中有如下所示的一条数据：</p>
-<table>
-<thead>
-<tr>
-<th>trx_id&#x3D;10</th>
-<th>数据<br />id&#x3D;1,name&#x3D;”张三”，age&#x3D;18</th>
-<th>roll_pointer&#x3D;null</th>
-</tr>
-</thead>
-</table>
-<p>现有两个事务A，B，他们的id分别是20和30</p>
-<p><strong>步骤一：</strong>事务A首先执行查询语句：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">select * from student where id &gt;=1; </span><br></pre></td></tr></table></figure>
-
-<p>在开始查询前ReadView的情况如下：trx_ids&#x3D;[20,30]，min_trx_id&#x3D;20 , max_trx_id&#x3D;31 , creator_trx_id&#x3D;20。由于<strong>trx_id&lt;min_tex_id</strong>,所以该条数据对于事务A可见</p>
-<p><strong>步骤二：</strong>事务B往表中插入两条数据，并提交事务。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">insert into student(id,name,age) values(2,&#x27;李四&#x27;,12);</span><br><span class="line">insert into student(id,name,age) values(3,&#x27;王五&#x27;,16); </span><br></pre></td></tr></table></figure>
-
-<p><strong>步骤三：</strong>接着事务 A 开启第二次查询，根据可重复读隔离级别的规则，此时事务 A 并不会再重新生成ReadView。此时表 student 中的 3 条数据都满足 where id&gt;&#x3D;1 的条件，因此会先查出来。然后根据ReadView 机制，判断每条数据是不是都可以被事务 A 看到。</p>
-<p><strong><font  color="red">分析如下</font></strong>:</p>
-<ul>
-<li><p>对于id&#x3D;1的记录，由于第一次和第二次查询使用的是同一个ReadView，所以该条数据能够被查询出来</p>
-</li>
-<li><p>对于id&#x3D;2和id&#x3D;3的记录，其实无论B事务提不提交对于A来说B的操作都是不可见的，理由如下：</p>
-</li>
-<li><p>如果B没有提交事务那么根据上面ReadView使用规则的第四条可以判断B事务新增的记录不可见</p>
-</li>
-<li><p>如果B提交了事务，此时trx_ids&#x3D;[20]，min_trx_id&#x3D;20，那么根据上面ReadView使用规则的第三条也可以判断这两条记录对于A来说不可见</p>
-</li>
-</ul>
-<h1 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h1><p>本文主要讲解了一下几点：</p>
-<ul>
-<li><a href="#%E4%B8%80.%E5%9B%9B%E5%A4%A7%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB">四大隔离级别</a></li>
-<li><a href="#%E4%BA%8C.MVCC">MVCC机制及其实现原理</a></li>
-<li><a href="#%E4%B8%89.MVCC%E6%9C%BA%E5%88%B6%E5%A6%82%E4%BD%95%E4%BF%9D%E8%AF%81%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E7%9A%84%E5%AE%9E%E7%8E%B0">MVCC机制如何保证读已提交和可重复读的实现</a></li>
-<li>[ReadView的应用规则](#2.3 ReadView的应用规则)</li>
-<li>[MVCC如何解决幻读](#3.5 如何解决幻读)</li>
-</ul>
-<p>希望这篇文章能够让你对MVCC有更好的了解<img src="https://dl4.weshineapp.com/gif/20170714/776d24c1ce2b76a37367b886699a25f0.gif?f=micro_5byA5b+D" alt="img"></p>
-]]></content>
-      <categories>
-        <category>MySQL</category>
-      </categories>
-      <tags>
-        <tag>MySQL技术分享</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>Redis分布式锁</title>
-    <url>/2023/cc4d73b2.html</url>
-    <content><![CDATA[<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>hello，大家好！今天想和大家分享一些有关Redis分布式锁相关方面的知识，以及如何手写一个分布式锁，废话不多说，我们现在开始。</p>
-<h1 id="什么是分布式锁"><a href="#什么是分布式锁" class="headerlink" title="什么是分布式锁"></a>什么是分布式锁</h1><h2 id="锁的种类"><a href="#锁的种类" class="headerlink" title="锁的种类"></a>锁的种类</h2><ul>
-<li>单机版。在同一个JVM虚拟机内的锁，如<strong>synchronized或者Lock接口</strong></li>
-<li>分布式。分布在多个JVM虚拟机内，此时单机的线程锁机制已经不起作用了，此时资源并不在同一台服务器上共享</li>
-</ul>
-<h2 id="为什么需要分布式锁？"><a href="#为什么需要分布式锁？" class="headerlink" title="为什么需要分布式锁？"></a>为什么需要分布式锁？</h2><h3 id="案例"><a href="#案例" class="headerlink" title="案例"></a>案例</h3><p>首先，随着业务的不断发展与扩大，我们不可能将所有业务和服务都部署在一台服务器上，肯定涉及到如MySQL的主从复制，Redis集群等等容灾措施。那么此时我们就面临一个问题就是如何让不同的客户端有序的访问同一个共享资源。如果是之前的单机版我们直接上锁即可，但是涉及到分布式，同一个资源整个集群里面的所有服务器共享，当一个客户端请求A发来时，可能经过Nginx反向代理到X服务器并对服务器上的共享资源上锁，但此时又有一个客户端请求B发来时，经过Nginx反向代理可能到Y服务器，此时虽然A对该资源上了锁但是仅仅是对X服务器有效，对于Y来说请求A依旧可以获取相关资源，此时就会发生冲突。可能出现<strong>超卖（在高并发环境下，大量请求同时访问同一个库存资源进行操作。这种情况下，由于多个请求可能同时读取到相同的库存数量，然后都判断库存充足并分别进行扣减操作，导致实际上库存数量被扣减得比实际的要少，从而出现超卖现象）</strong>现象，因此，我们需要分布式锁来对整个分布式集群的共享资源上锁，所有请求必须先获取到这把锁才能进行后续操作。</p>
-<p><img src="/../images/4-1.png"></p>
-<h3 id="分布式锁解决了那些问题"><a href="#分布式锁解决了那些问题" class="headerlink" title="分布式锁解决了那些问题"></a>分布式锁解决了那些问题</h3><p>####跨进程+跨服务</p>
-<p>分布式锁是一种跨进程和跨服务的技术，主要用于解决在分布式环境中多个执行线程访问共享资源时可能出现的数据不一致问题。它可以实现进程间同步访问共享资源，通过全局共享来实现全局锁的效果，从而确保数据一致性。其实现机制一般涉及共享存储系统保存锁变量，加锁和释放锁的过程需要保证操作的原子性</p>
-<h4 id="超卖现象"><a href="#超卖现象" class="headerlink" title="超卖现象"></a>超卖现象</h4><p>同上述解释类似，库存这个全局共享资源被加上分布式锁后，所有访问请求都必须获取到这把锁后才能对共享资源进行操作，这样就保证了同一时间只有一个线程对整个Redis集群里面的共享资源进行操作，保证了数据一致性。**(ps:可以思考一下这种情况下如何提高系统并发访问量)**</p>
-<h4 id="防止缓存击穿"><a href="#防止缓存击穿" class="headerlink" title="防止缓存击穿"></a>防止缓存击穿</h4><p>当Redis中没有数据时，请求往往会打到数据库上，当有大量请求都去访问数据库时，就会给数据库造成大量负担，存在一定隐患。而分布式锁就可以解决这个问题，当有大量请求过来时，只有第一个请求能拿到锁其他请求线程并进入Redis后发现没有数据，之后就去数据库请求数据，拿到数据后返回客户端并回写Redis，然后释放锁，之后的线程在Redis拿到数据后就不会再去访问数据库，起到了防止缓存击穿的作用。</p>
-<h1 id="如何手写一个分布式锁-带你走进分布式锁的原理"><a href="#如何手写一个分布式锁-带你走进分布式锁的原理" class="headerlink" title="如何手写一个分布式锁(带你走进分布式锁的原理)"></a>如何手写一个分布式锁(带你走进分布式锁的原理)</h1><h2 id="一个可靠的分布式锁应具备的刚需"><a href="#一个可靠的分布式锁应具备的刚需" class="headerlink" title="一个可靠的分布式锁应具备的刚需"></a>一个可靠的分布式锁应具备的刚需</h2><p><strong>独占性：</strong>在任何时候都要保证只能有一个线程访问</p>
-<p><strong>高可用：</strong>在Redis集群的情况下，不能因为某个节点挂了而出现上锁和解锁失败的情况，同时，在高并发的情景下，依旧能正常运行</p>
-<p><strong>防死锁</strong>：杜绝死锁，必须要有超时机制和撤销机制</p>
-<p><strong>防乱删：</strong>自己加的锁只能由自己释放，其他线程不能解其他线程的锁</p>
-<p><strong>可重入：</strong>同一个节点的同一个线程获取一把锁后，它也可以再次获取这把锁</p>
-<h2 id="版本一（setnx-递归调用）"><a href="#版本一（setnx-递归调用）" class="headerlink" title="版本一（setnx+递归调用）"></a>版本一（setnx+递归调用）</h2><p>原理：利用setnx命令先判断当前Redis集群有没有一个变量Lock，如果存在那么说明已经有线程在操作共享资源，此时就要阻塞，循环等待，等待持有锁的线程完成操作后del这把锁，此后其他线程就能进去持有锁(类比一个厕所有很多人要上，每个人进去后先锁门，解决后在开锁开门，之后其他人就能进去了),代码如下：</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="meta">@Slf4j</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">InventoryService</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> StringRedisTemplate stringRedisTemplate;</span><br><span class="line">    <span class="meta">@Value(&quot;$&#123;server.port&#125;&quot;)</span></span><br><span class="line">    <span class="keyword">private</span> String port;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="type">Lock</span> <span class="variable">lock</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ReentrantLock</span>();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">sale</span><span class="params">()</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="type">String</span> <span class="variable">retMessage</span> <span class="operator">=</span> <span class="string">&quot;&quot;</span>;</span><br><span class="line">        <span class="type">String</span> <span class="variable">key</span> <span class="operator">=</span> <span class="string">&quot;RedisLock&quot;</span>;</span><br><span class="line">        <span class="type">String</span> <span class="variable">uuidValue</span> <span class="operator">=</span> IdUtil.simpleUUID()+<span class="string">&quot;:&quot;</span>+Thread.currentThread().getId();</span><br><span class="line"></span><br><span class="line">        <span class="type">Boolean</span> <span class="variable">flag</span> <span class="operator">=</span> stringRedisTemplate.opsForValue().setIfAbsent(key, uuidValue);</span><br><span class="line">        <span class="keyword">if</span>(!flag)&#123;</span><br><span class="line">            <span class="comment">//暂停20毫秒后递归调用</span></span><br><span class="line">            <span class="keyword">try</span> &#123; TimeUnit.MILLISECONDS.sleep(<span class="number">20</span>); &#125; <span class="keyword">catch</span> (InterruptedException e) &#123; e.printStackTrace(); &#125;</span><br><span class="line">            sale();</span><br><span class="line">        &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">            <span class="keyword">try</span>&#123;</span><br><span class="line">                <span class="comment">//1 查询库存信息</span></span><br><span class="line">                <span class="type">String</span> <span class="variable">result</span> <span class="operator">=</span> stringRedisTemplate.opsForValue().get(<span class="string">&quot;inventory001&quot;</span>);</span><br><span class="line">                <span class="comment">//2 判断库存是否足够</span></span><br><span class="line">                <span class="type">Integer</span> <span class="variable">inventoryNumber</span> <span class="operator">=</span> result == <span class="literal">null</span> ? <span class="number">0</span> : Integer.parseInt(result);</span><br><span class="line">                <span class="comment">//3 扣减库存</span></span><br><span class="line">                <span class="keyword">if</span>(inventoryNumber &gt; <span class="number">0</span>) &#123;</span><br><span class="line">                    stringRedisTemplate.opsForValue().set(<span class="string">&quot;inventory001&quot;</span>,String.valueOf(--inventoryNumber));</span><br><span class="line">                    retMessage = <span class="string">&quot;成功卖出一个商品，库存剩余: &quot;</span>+inventoryNumber;</span><br><span class="line">                    System.out.println(retMessage);</span><br><span class="line">                &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">                    retMessage = <span class="string">&quot;商品卖完了，o(╥﹏╥)o&quot;</span>;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;<span class="keyword">finally</span> &#123;</span><br><span class="line">                stringRedisTemplate.delete(key);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> retMessage+<span class="string">&quot;\t&quot;</span>+<span class="string">&quot;服务端口号：&quot;</span>+port;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><strong>缺陷：</strong>众所周知，递归存在一个比较明显的问题就是容易“栈溢出”，存在漏洞</p>
-<p><strong>改进：</strong>对JUC了解的话我们可以利用JUC里面自旋锁的思想将if改成while防止虚假唤醒，用while循环代替递归</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">while</span>(!stringRedisTemplate.opsForValue().setIfAbsent(key, uuidValue))&#123;</span><br><span class="line">            <span class="comment">//暂停20毫秒，类似CAS自旋</span></span><br><span class="line">            <span class="keyword">try</span> &#123; TimeUnit.MILLISECONDS.sleep(<span class="number">20</span>); &#125; <span class="keyword">catch</span> (InterruptedException e) &#123; e.printStackTrace(); &#125;</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
-
-<h2 id="版本二-setnx-ttl"><a href="#版本二-setnx-ttl" class="headerlink" title="版本二(setnx+ttl)"></a>版本二(setnx+ttl)</h2><p><strong>版本一存在的问题：</strong>当线程上锁后，服务器宕机，导致该线程无法释放锁，这就导致后续请求无法访问Redis，造成死锁严重影响</p>
-<p><strong>解决方法：</strong>可以给锁设置一个ttl过期时间，这样即使宕机无法解锁，那么过期时间一到这把锁就会自动失效，这样后面的线程就能正常访问了</p>
-<p><strong>注意事项：</strong>加锁和加过期时间的操作必须保证原子性(原因很简单，如果先加锁，再加过期时间，那么如果加完锁后如果服务器宕机那么给锁加过期时间的操作就没有进行，那么就依旧存在上述问题)</p>
-<p><strong>较版本一修改如下</strong></p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">while</span>(!stringRedisTemplate.opsForValue().setIfAbsent(key, uuidValue,<span class="number">30L</span>,TimeUnit.SECONDS))</span><br><span class="line">       &#123;</span><br><span class="line">           <span class="comment">//暂停毫秒</span></span><br><span class="line">           <span class="keyword">try</span> &#123; TimeUnit.MILLISECONDS.sleep(<span class="number">20</span>); &#125; <span class="keyword">catch</span> (InterruptedException e) &#123; e.printStackTrace(); &#125;</span><br><span class="line">       &#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<h2 id="版本三-setnx-ttl-uuid"><a href="#版本三-setnx-ttl-uuid" class="headerlink" title="版本三(setnx+ttl+uuid)"></a>版本三(setnx+ttl+uuid)</h2><p><strong>版本二存在的问题：</strong>虽然版本二给锁加上了过期时间，但是一旦业务处理时间超过了过期时间，那么加的锁就过期失效了，那么其他线程就能访问Redis并设置新的锁，此时如果旧线程完成业务后执行del操作，将新线程的锁删除了之后，就会出现误删的情况，存在一定安全隐患。</p>
-<p><strong>改进方法：</strong>加锁时传入一个此线程的uuid，每次删除锁时，需要判断当前线程是否锁的持有线程，如果是则可以正常删除，否则阻塞。</p>
-<p><strong>较版本二修改如下</strong></p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span>(inventoryNumber &gt; <span class="number">0</span>) &#123;</span><br><span class="line">               stringRedisTemplate.opsForValue().set(<span class="string">&quot;inventory001&quot;</span>,String.valueOf(--inventoryNumber));</span><br><span class="line">               retMessage = <span class="string">&quot;成功卖出一个商品，库存剩余: &quot;</span>+inventoryNumber+<span class="string">&quot;\t&quot;</span>+uuidValue;</span><br><span class="line">               System.out.println(retMessage);</span><br><span class="line">           &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">               retMessage = <span class="string">&quot;商品卖完了，o(╥﹏╥)o&quot;</span>;</span><br><span class="line">           &#125;</span><br><span class="line">       &#125;<span class="keyword">finally</span> &#123;</span><br><span class="line">           <span class="comment">// v5.0判断加锁与解锁是不是同一个客户端，同一个才行，自己只能删除自己的锁，不误删他人的</span></span><br><span class="line">           <span class="keyword">if</span>(stringRedisTemplate.opsForValue().get(key).equalsIgnoreCase(uuidValue))&#123;</span><br><span class="line">               stringRedisTemplate.delete(key);</span><br><span class="line">           &#125;</span><br><span class="line">       &#125;</span><br></pre></td></tr></table></figure>
-
-<h2 id="版本四-setnx-ttl-uuid-lua"><a href="#版本四-setnx-ttl-uuid-lua" class="headerlink" title="版本四(setnx+ttl+uuid+lua)"></a>版本四(setnx+ttl+uuid+lua)</h2><p><strong>版本三存在的问题：</strong>finally块的判断+del操作不具备原子性</p>
-<p><strong>改进方法：</strong>使用lua脚本，将判断和删除整合一起，使之具有原子性，具体的lua脚本学习可以参考官网<br>                    <a href="https://redis.io/docs/reference/patterns/distributed-locks/">官网</a></p>
-<p><strong>较版本三修改如下</strong></p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">//V6.0 将判断+删除自己的合并为lua脚本保证原子性</span></span><br><span class="line">           <span class="type">String</span> <span class="variable">luaScript</span> <span class="operator">=</span></span><br><span class="line">                   <span class="string">&quot;if (redis.call(&#x27;get&#x27;,KEYS[1]) == ARGV[1]) then &quot;</span> +</span><br><span class="line">                       <span class="string">&quot;return redis.call(&#x27;del&#x27;,KEYS[1]) &quot;</span> +</span><br><span class="line">                   <span class="string">&quot;else &quot;</span> +</span><br><span class="line">                       <span class="string">&quot;return 0 &quot;</span> +</span><br><span class="line">                   <span class="string">&quot;end&quot;</span>;</span><br><span class="line">           stringRedisTemplate.execute(<span class="keyword">new</span> <span class="title class_">DefaultRedisScript</span>&lt;&gt;(luaScript, Boolean.class), Arrays.asList(key), uuidValue);</span><br></pre></td></tr></table></figure>
-
-
-
-<h2 id="版本五-setnx-ttl-uuid-lua-可重入"><a href="#版本五-setnx-ttl-uuid-lua-可重入" class="headerlink" title="版本五(setnx+ttl+uuid+lua+可重入)"></a>版本五(setnx+ttl+uuid+lua+可重入)</h2><p><strong>版本四存在的问题：</strong>如何兼顾可重入性问题？关于锁的可重入可以参考JUC相关方面的知识，这里不做过多解释。如果不能实现可重入，那么如果业务需求重复调用该方法，那么第一次调用方法时上锁，第二次再次调用时该线程被自己上一次调用方法上的锁阻塞，这不是作茧自缚吗？因此实现可从入性是衡量一把锁好坏高低的一个重要指标</p>
-<p><strong>改进方法：</strong>可重入锁的基本思想就是没锁加锁，如果同一个线程再次请求获得同一把还未解锁的锁，那么计数器+1，lock几次，对应的unlock也要几次，综上，我们可以利用Redis中的hash数据结构**(Map&lt;String,Map&lt;Object,Object&gt;&gt;)**来实现</p>
-<p><strong>小总结：</strong></p>
-<ul>
-<li><strong>setnx</strong>只能解决有无锁的问题</li>
-<li><strong>hset</strong>不仅能解决有无，还能解决可重入问题</li>
-</ul>
-<p>所以，你知道设计一个Redis分布式锁该用什么命令了吗</p>
-<h3 id="设计思路"><a href="#设计思路" class="headerlink" title="设计思路"></a>设计思路</h3><h4 id="加锁lua脚本"><a href="#加锁lua脚本" class="headerlink" title="加锁lua脚本"></a>加锁lua脚本</h4><ul>
-<li>判断Redis分布式锁的key是否存在</li>
-<li>如果返回0不存在，则hset属于自己线程的锁，否则需要进一步判断这把锁是不是属于自己的</li>
-<li>如果返回0则说明不是自己的，循环等待；否则，将该锁的计数器+1</li>
-</ul>
-<figure class="highlight lua"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span> redis.call(<span class="string">&#x27;exists&#x27;</span>,KEYS[<span class="number">1</span>]) == <span class="number">0</span> <span class="keyword">or</span> redis.call(<span class="string">&#x27;hexists&#x27;</span>,KEYS[<span class="number">1</span>],ARGV[<span class="number">1</span>]) == <span class="number">1</span> <span class="keyword">then</span> </span><br><span class="line"></span><br><span class="line">  redis.call(<span class="string">&#x27;hincrby&#x27;</span>,KEYS[<span class="number">1</span>],ARGV[<span class="number">1</span>],<span class="number">1</span>) </span><br><span class="line"></span><br><span class="line">  redis.call(<span class="string">&#x27;expire&#x27;</span>,KEYS[<span class="number">1</span>],ARGV[<span class="number">2</span>]) </span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> <span class="number">1</span> </span><br><span class="line"></span><br><span class="line"><span class="keyword">else</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">end</span></span><br></pre></td></tr></table></figure>
-
-<h4 id="解锁lua脚本"><a href="#解锁lua脚本" class="headerlink" title="解锁lua脚本"></a>解锁lua脚本</h4><ul>
-<li>判断Redis分布式锁的key是否存在</li>
-<li>如果返回0不存在，则程序直接返回nil，否则需要进一步判断这把锁是不是属于自己的</li>
-<li>返回0，说明锁不是自己的，不能删除；否则直接调用hincrby -1 对锁进行-1，减至0后直接删除</li>
-</ul>
-<figure class="highlight lua"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span> redis.call(<span class="string">&#x27;HEXISTS&#x27;</span>,KEYS[<span class="number">1</span>],ARGV[<span class="number">1</span>]) == <span class="number">0</span> <span class="keyword">then</span></span><br><span class="line"></span><br><span class="line"> <span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">elseif</span> redis.call(<span class="string">&#x27;HINCRBY&#x27;</span>,KEYS[<span class="number">1</span>],ARGV[<span class="number">1</span>],<span class="number">-1</span>) == <span class="number">0</span> <span class="keyword">then</span></span><br><span class="line"></span><br><span class="line"> <span class="keyword">return</span> redis.call(<span class="string">&#x27;del&#x27;</span>,KEYS[<span class="number">1</span>])</span><br><span class="line"></span><br><span class="line"><span class="keyword">else</span></span><br><span class="line"></span><br><span class="line"> <span class="keyword">return</span> <span class="number">0</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">end</span></span><br></pre></td></tr></table></figure>
-
-<p><strong>代码修改</strong></p>
-<p>将上述加锁解锁lua脚本分别替换while中的循环条件和后续del的lua脚本即可</p>
-<p><strong>优化：</strong></p>
-<ul>
-<li><p>利用juc中的lock接口，通过实现lock接口实现分布式锁</p>
-</li>
-<li><p>这里只是实现了Redis分布式锁，那万一以后需要MySQL，Zookeeper分布式锁怎么办？所以这里建议引入工厂模式</p>
-</li>
-</ul>
-<h2 id="版本六-setnx-ttl-uuid-lua-可重入-自动续期"><a href="#版本六-setnx-ttl-uuid-lua-可重入-自动续期" class="headerlink" title="版本六(setnx+ttl+uuid+lua+可重入+自动续期)"></a>版本六(setnx+ttl+uuid+lua+可重入+自动续期)</h2><p><strong>版本五存在的问题：</strong>仔细观察会发现其实至始至终都没有解决业务处理时间大于锁的过期时间时的问题，哪怕是<strong>版本三</strong>我们也只是通过加一个uuid判断条件来防止锁被误删，所以我们需要给锁加一个可以自动续期的功能。</p>
-<p><strong>改进方法：</strong>通过加一个定时任务，有点类似看门狗策略，每当过期时间过了一段时间后就会自动触发，给锁自动续时间</p>
-<figure class="highlight lua"><table><tr><td class="code"><pre><span class="line">//==============自动续期</span><br><span class="line"><span class="keyword">if</span> redis.call(<span class="string">&#x27;HEXISTS&#x27;</span>,KEYS[<span class="number">1</span>],ARGV[<span class="number">1</span>]) == <span class="number">1</span> <span class="keyword">then</span></span><br><span class="line">  <span class="keyword">return</span> Vredis.call(<span class="string">&#x27;expire&#x27;</span>,KEYS[<span class="number">1</span>],ARGV[<span class="number">2</span>])</span><br><span class="line"><span class="keyword">else</span></span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span></span><br><span class="line">endV</span><br></pre></td></tr></table></figure>
-
-
-
-<p><strong>代码较版本五修改如下：</strong></p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">RedisDistributedLock</span> <span class="keyword">implements</span> <span class="title class_">Lock</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">private</span> StringRedisTemplate stringRedisTemplate;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> String lockName;<span class="comment">//KEYS[1]</span></span><br><span class="line">    <span class="keyword">private</span> String uuidValue;<span class="comment">//ARGV[1]</span></span><br><span class="line">    <span class="keyword">private</span> <span class="type">long</span>   expireTime;<span class="comment">//ARGV[2]</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="title function_">RedisDistributedLock</span><span class="params">(StringRedisTemplate stringRedisTemplate,String lockName,String uuidValue)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="built_in">this</span>.stringRedisTemplate = stringRedisTemplate;</span><br><span class="line">        <span class="built_in">this</span>.lockName = lockName;</span><br><span class="line">        <span class="built_in">this</span>.uuidValue = uuidValue+<span class="string">&quot;:&quot;</span>+Thread.currentThread().getId();</span><br><span class="line">        <span class="built_in">this</span>.expireTime = <span class="number">30L</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">lock</span><span class="params">()</span></span><br><span class="line">    &#123;</span><br><span class="line">        tryLock();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">tryLock</span><span class="params">()</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;tryLock(-<span class="number">1L</span>,TimeUnit.SECONDS);&#125; <span class="keyword">catch</span> (InterruptedException e) &#123;e.printStackTrace();&#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 干活的，实现加锁功能，实现这一个干活的就OK，全盘通用</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> time</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> unit</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span></span></span><br><span class="line"><span class="comment">     * <span class="doctag">@throws</span> InterruptedException</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">tryLock</span><span class="params">(<span class="type">long</span> time, TimeUnit unit)</span> <span class="keyword">throws</span> InterruptedException</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span>(time != -<span class="number">1L</span>)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="built_in">this</span>.expireTime = unit.toSeconds(time);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="type">String</span> <span class="variable">script</span> <span class="operator">=</span></span><br><span class="line">                <span class="string">&quot;if redis.call(&#x27;exists&#x27;,KEYS[1]) == 0 or redis.call(&#x27;hexists&#x27;,KEYS[1],ARGV[1]) == 1 then &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;redis.call(&#x27;hincrby&#x27;,KEYS[1],ARGV[1],1) &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;redis.call(&#x27;expire&#x27;,KEYS[1],ARGV[2]) &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;return 1 &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;else &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;return 0 &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;end&quot;</span>;</span><br><span class="line"></span><br><span class="line">        System.out.println(<span class="string">&quot;script: &quot;</span>+script);</span><br><span class="line">        System.out.println(<span class="string">&quot;lockName: &quot;</span>+lockName);</span><br><span class="line">        System.out.println(<span class="string">&quot;uuidValue: &quot;</span>+uuidValue);</span><br><span class="line">        System.out.println(<span class="string">&quot;expireTime: &quot;</span>+expireTime);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">while</span> (!stringRedisTemplate.execute(<span class="keyword">new</span> <span class="title class_">DefaultRedisScript</span>&lt;&gt;(script,Boolean.class), Arrays.asList(lockName),uuidValue,String.valueOf(expireTime))) &#123;</span><br><span class="line">            TimeUnit.MILLISECONDS.sleep(<span class="number">50</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="built_in">this</span>.renewExpire();</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     *干活的，实现解锁功能</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">unlock</span><span class="params">()</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="type">String</span> <span class="variable">script</span> <span class="operator">=</span></span><br><span class="line">                <span class="string">&quot;if redis.call(&#x27;HEXISTS&#x27;,KEYS[1],ARGV[1]) == 0 then &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;   return nil &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;elseif redis.call(&#x27;HINCRBY&#x27;,KEYS[1],ARGV[1],-1) == 0 then &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;   return redis.call(&#x27;del&#x27;,KEYS[1]) &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;else &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;   return 0 &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;end&quot;</span>;</span><br><span class="line">        <span class="comment">// nil = false 1 = true 0 = false</span></span><br><span class="line">        System.out.println(<span class="string">&quot;lockName: &quot;</span>+lockName);</span><br><span class="line">        System.out.println(<span class="string">&quot;uuidValue: &quot;</span>+uuidValue);</span><br><span class="line">        System.out.println(<span class="string">&quot;expireTime: &quot;</span>+expireTime);</span><br><span class="line">        <span class="type">Long</span> <span class="variable">flag</span> <span class="operator">=</span> stringRedisTemplate.execute(<span class="keyword">new</span> <span class="title class_">DefaultRedisScript</span>&lt;&gt;(script, Long.class), Arrays.asList(lockName),uuidValue,String.valueOf(expireTime));</span><br><span class="line">        <span class="keyword">if</span>(flag == <span class="literal">null</span>)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">RuntimeException</span>(<span class="string">&quot;This lock doesn&#x27;t EXIST&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">void</span> <span class="title function_">renewExpire</span><span class="params">()</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="type">String</span> <span class="variable">script</span> <span class="operator">=</span></span><br><span class="line">                <span class="string">&quot;if redis.call(&#x27;HEXISTS&#x27;,KEYS[1],ARGV[1]) == 1 then &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;return redis.call(&#x27;expire&#x27;,KEYS[1],ARGV[2]) &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;else &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;return 0 &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;end&quot;</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">new</span> <span class="title class_">Timer</span>().schedule(<span class="keyword">new</span> <span class="title class_">TimerTask</span>()</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">run</span><span class="params">()</span></span><br><span class="line">            &#123;</span><br><span class="line">                <span class="keyword">if</span> (stringRedisTemplate.execute(<span class="keyword">new</span> <span class="title class_">DefaultRedisScript</span>&lt;&gt;(script, Boolean.class), Arrays.asList(lockName),uuidValue,String.valueOf(expireTime))) &#123;</span><br><span class="line">                    renewExpire();</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;,(<span class="built_in">this</span>.expireTime * <span class="number">1000</span>)/<span class="number">3</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//===下面的redis分布式锁暂时用不到=======================================</span></span><br><span class="line">    <span class="comment">//===下面的redis分布式锁暂时用不到=======================================</span></span><br><span class="line">    <span class="comment">//===下面的redis分布式锁暂时用不到=======================================</span></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">lockInterruptibly</span><span class="params">()</span> <span class="keyword">throws</span> InterruptedException</span><br><span class="line">    &#123;</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> Condition <span class="title function_">newCondition</span><span class="params">()</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-
-
-<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><h2 id="为什么需要Redis分布式锁"><a href="#为什么需要Redis分布式锁" class="headerlink" title="为什么需要Redis分布式锁"></a>为什么需要Redis分布式锁</h2><p>单机锁只能在一台JVM虚拟机中有效，在集群的不同服务器上如果只用单机锁会存在超卖问题</p>
-<h2 id="Redis分布式锁解决了哪些问题"><a href="#Redis分布式锁解决了哪些问题" class="headerlink" title="Redis分布式锁解决了哪些问题"></a>Redis分布式锁解决了哪些问题</h2><ul>
-<li>跨进程和跨服务</li>
-<li>解决超卖</li>
-<li>防止缓存击穿</li>
-</ul>
-<h2 id="手写Redis分布式锁流程"><a href="#手写Redis分布式锁流程" class="headerlink" title="手写Redis分布式锁流程"></a>手写Redis分布式锁流程</h2><ul>
-<li>单机版synchronized，lock锁，面对分布式部署时可能出现超卖现象</li>
-<li>使用setnx命令上Redis分布式锁</li>
-<li>只是加锁了，但是没有给锁设置过期时间，如果服务器宕机会导致无法解锁，影响后续请求，因此，使用ttl命令给锁设置一个过期时间</li>
-<li>加锁和设置过期时间的操作要保证原子性</li>
-<li>设置了过期时间可能存在误删锁的情况，所以需要加上一个<strong>uuid</strong>来判断当前线程是否是锁的拥有者，只有自己才能解自己的锁</li>
-<li>为了保证<strong>uuid</strong>的判断和<strong>del</strong>删除原子性，我们可以通过引入lua脚本来保证命令原子性</li>
-<li>之后为了防止作茧自缚，我们需要让锁具有可重入性</li>
-<li>最后，我们需要给锁加个定时任务，到点自动给锁续期，保证在锁的过期时间内能够完成业务</li>
-</ul>
-]]></content>
-      <categories>
-        <category>Redis</category>
-      </categories>
-      <tags>
-        <tag>Redis知识分享</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>Redis双写一致性</title>
     <url>/2023/b0280743.html</url>
     <content><![CDATA[<h1 id="双写一致性是什么？"><a href="#双写一致性是什么？" class="headerlink" title="双写一致性是什么？"></a>双写一致性是什么？</h1><h2 id="什么是双写？"><a href="#什么是双写？" class="headerlink" title="什么是双写？"></a>什么是双写？</h2><p>双写其实是针对Redis缓存和MySQL数据库来说的，是指在写入数据时，将数据同时写入两个地方，一个是数据库，另一个是缓存。这样，当读取数据时，首先从缓存中读取，如果缓存中没有数据，则从数据库中读取并将其写入缓存。这种方法可以提高读取速度并减少对数据库的访问次数。</p>
@@ -1057,81 +947,6 @@
       </categories>
       <tags>
         <tag>Redis知识分享</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>如何上线和部署一个项目</title>
-    <url>/2024/a77db1b1.html</url>
-    <content><![CDATA[<h1 id="部署-上线"><a href="#部署-上线" class="headerlink" title="部署 &amp; 上线"></a>部署 &amp; 上线</h1><h2 id="公网能够访问到的一台服务器"><a href="#公网能够访问到的一台服务器" class="headerlink" title="公网能够访问到的一台服务器"></a>公网能够访问到的一台服务器</h2><p>我们的项目一般只能使用本地localhost地址来自己访问，要想要其他人也能够访问到我们的项目，需要一台能够在公网访问到的服务器，这里我们就需要向一些云服务厂商(阿里云，腾讯云，华为云等)购买。推荐安装Centos7.6及以上版本或者Linux宝塔界面系统（对新手比较友好），最低配2核2G。</p>
-<h3 id="配置安全组（防火墙）"><a href="#配置安全组（防火墙）" class="headerlink" title="配置安全组（防火墙）"></a>配置安全组（防火墙）</h3><p>刚买来的服务器仅开放很少的端口，你需要将自己需要的端口自行打开，不然你的请求会被拒绝，例如一些常用端口</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">80:http</span><br><span class="line">443:https</span><br><span class="line">3306:MySQL</span><br><span class="line">22:SSH</span><br><span class="line">6379:redis</span><br></pre></td></tr></table></figure>
-
-
-
-<h2 id="前端"><a href="#前端" class="headerlink" title="前端"></a>前端</h2><p>部署前端项目，我们需要把我们的一些页面交由Web服务器来管理，以便用户能够正常访问我们的前端项目入口页面。</p>
-<p><strong>常见的Web服务器：</strong></p>
-<ul>
-<li>Nginx</li>
-<li>tomcat</li>
-<li>apache</li>
-</ul>
-<p>我们这里使用的是<strong>Nginx</strong></p>
-<h3 id="安装Nginx"><a href="#安装Nginx" class="headerlink" title="安装Nginx"></a>安装Nginx</h3><p>方法一：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">curl -o nginx-1.21.6.tar.gz http://nginx.org/download/nginx-1.21.6.tar.gz</span><br><span class="line">tar -zxvf nginx-1.21.6.tar.gz</span><br></pre></td></tr></table></figure>
-
-<p>方法二：</p>
-<p>下载<strong>Xshell</strong>和<strong>Xftp</strong>远程访问工具</p>
-<p>将xshell和xftp连接到远程服务器之后你可以先在官网下载nginx-1.21.6.tar.gz包，然后直接通过Xftp拖入Linux服务器中。</p>
-<h3 id="下载Nginx依赖，编译"><a href="#下载Nginx依赖，编译" class="headerlink" title="下载Nginx依赖，编译"></a>下载Nginx依赖，编译</h3><p><strong>依赖下载：</strong></p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">yum install -y gcc //下载编译器</span><br><span class="line">yum install -y pcre pcre-devel //下载依赖</span><br><span class="line">yum install -y zlib zlib-devel //下载依赖</span><br></pre></td></tr></table></figure>
-
-<p><strong>编译：</strong></p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">make</span><br><span class="line">make install</span><br></pre></td></tr></table></figure>
-
-<p>编译完成后，nginx目录会安装到你服务器的**&#x2F;usr&#x2F;local**目录下</p>
-<p><strong>修改配置文件：</strong></p>
-<p>进入nginx目录中的Conf目录，修改nginx.conf配置文件，将你前端文件的目录路径放到<strong>location</strong>配置中，这个配置是nginx访问的默认位置 </p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">location / &#123;</span><br><span class="line">            root   //前端文件目录所在路径;</span><br><span class="line">            index  index.html index.htm;</span><br><span class="line">            //try_files <span class="variable">$uri</span> <span class="variable">$uri</span>/index.html /index.html;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<p><strong>开启进程所有者：</strong></p>
-<p>还是这个conf目录第一行有一行注释 “# user root”，将前面这个“#”去掉，打开nginx进程的所有者，不然会被403墙掉。</p>
-<p><strong>重新加载配置文件：</strong></p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">./nginx -s re1oad //重新加载配置</span><br></pre></td></tr></table></figure>
-
-
-
-<p><strong>启动Nginx：</strong></p>
-<p>去到nginx目录的bin目录下执行启动命令即可</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">./nginx //启动命令</span><br></pre></td></tr></table></figure>
-
-<p><strong>关闭防火墙：</strong></p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">systemctl stop firewalld</span><br></pre></td></tr></table></figure>
-
-<p><strong>测试：</strong></p>
-<p>直接浏览器访问你的服务器IP地址，如果成功展示你的页面即成功。</p>
-<h2 id="后端"><a href="#后端" class="headerlink" title="后端"></a>后端</h2><h2 id="安装数据库，Java，Nacos等"><a href="#安装数据库，Java，Nacos等" class="headerlink" title="安装数据库，Java，Nacos等"></a>安装数据库，Java，Nacos等</h2><p><strong>数据库：</strong></p>
-<p>如果你比较豪，可以直接购买云服务厂商的数据库服务，如果没有则也可以自己在服务器上安装，这里给个安装教程链接，你也可以网上自行搜索相关教程</p>
-<p><strong>Java：</strong></p>
-<p>直接执行以下安装命令即可，你也可以将自己电脑本地的JDK包使用Xftp拖拽进服务器（不过这种方式需要手动配置系统环境），建议安装JDK11及以上的版本（PS：有时候会报版本太低无法运行的错误）。</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">yum install java-11-openjdk*</span><br></pre></td></tr></table></figure>
-
-<p><strong>验证：</strong></p>
-<p>执行命令，如果成功显示你所使用的java版本及安装成功</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">java --version</span><br></pre></td></tr></table></figure>
-
-<h2 id="打包本地后端项目代码"><a href="#打包本地后端项目代码" class="headerlink" title="打包本地后端项目代码"></a>打包本地后端项目代码</h2><h3 id="使用maven-命令打包"><a href="#使用maven-命令打包" class="headerlink" title="使用maven 命令打包"></a>使用maven 命令打包</h3><p><strong>打开终端，执行install</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">install</span><br></pre></td></tr></table></figure>
-
-<p>生成jar包文件后上传至服务器</p>
-<p><strong>执行jar包</strong></p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">java -jar ./你的jar包名称 <span class="comment">//当前终端执行</span></span><br><span class="line">nohup java -jar ./你的jar包名称 &amp;  <span class="comment">// 后台执行 </span></span><br><span class="line">jobs <span class="comment">//查看后台进程命令</span></span><br></pre></td></tr></table></figure>
-
-]]></content>
-      <categories>
-        <category>技术分享</category>
-      </categories>
-      <tags>
-        <tag>技术分享</tag>
       </tags>
   </entry>
   <entry>
@@ -1303,6 +1118,222 @@
       </categories>
       <tags>
         <tag>JVM</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>如何上线和部署一个项目</title>
+    <url>/2024/a77db1b1.html</url>
+    <content><![CDATA[<h1 id="部署-上线"><a href="#部署-上线" class="headerlink" title="部署 &amp; 上线"></a>部署 &amp; 上线</h1><h2 id="公网能够访问到的一台服务器"><a href="#公网能够访问到的一台服务器" class="headerlink" title="公网能够访问到的一台服务器"></a>公网能够访问到的一台服务器</h2><p>我们的项目一般只能使用本地localhost地址来自己访问，要想要其他人也能够访问到我们的项目，需要一台能够在公网访问到的服务器，这里我们就需要向一些云服务厂商(阿里云，腾讯云，华为云等)购买。推荐安装Centos7.6及以上版本或者Linux宝塔界面系统（对新手比较友好），最低配2核2G。</p>
+<h3 id="配置安全组（防火墙）"><a href="#配置安全组（防火墙）" class="headerlink" title="配置安全组（防火墙）"></a>配置安全组（防火墙）</h3><p>刚买来的服务器仅开放很少的端口，你需要将自己需要的端口自行打开，不然你的请求会被拒绝，例如一些常用端口</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">80:http</span><br><span class="line">443:https</span><br><span class="line">3306:MySQL</span><br><span class="line">22:SSH</span><br><span class="line">6379:redis</span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id="前端"><a href="#前端" class="headerlink" title="前端"></a>前端</h2><p>部署前端项目，我们需要把我们的一些页面交由Web服务器来管理，以便用户能够正常访问我们的前端项目入口页面。</p>
+<p><strong>常见的Web服务器：</strong></p>
+<ul>
+<li>Nginx</li>
+<li>tomcat</li>
+<li>apache</li>
+</ul>
+<p>我们这里使用的是<strong>Nginx</strong></p>
+<h3 id="安装Nginx"><a href="#安装Nginx" class="headerlink" title="安装Nginx"></a>安装Nginx</h3><p>方法一：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">curl -o nginx-1.21.6.tar.gz http://nginx.org/download/nginx-1.21.6.tar.gz</span><br><span class="line">tar -zxvf nginx-1.21.6.tar.gz</span><br></pre></td></tr></table></figure>
+
+<p>方法二：</p>
+<p>下载<strong>Xshell</strong>和<strong>Xftp</strong>远程访问工具</p>
+<p>将xshell和xftp连接到远程服务器之后你可以先在官网下载nginx-1.21.6.tar.gz包，然后直接通过Xftp拖入Linux服务器中。</p>
+<h3 id="下载Nginx依赖，编译"><a href="#下载Nginx依赖，编译" class="headerlink" title="下载Nginx依赖，编译"></a>下载Nginx依赖，编译</h3><p><strong>依赖下载：</strong></p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">yum install -y gcc //下载编译器</span><br><span class="line">yum install -y pcre pcre-devel //下载依赖</span><br><span class="line">yum install -y zlib zlib-devel //下载依赖</span><br></pre></td></tr></table></figure>
+
+<p><strong>编译：</strong></p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">make</span><br><span class="line">make install</span><br></pre></td></tr></table></figure>
+
+<p>编译完成后，nginx目录会安装到你服务器的**&#x2F;usr&#x2F;local**目录下</p>
+<p><strong>修改配置文件：</strong></p>
+<p>进入nginx目录中的Conf目录，修改nginx.conf配置文件，将你前端文件的目录路径放到<strong>location</strong>配置中，这个配置是nginx访问的默认位置 </p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">location / &#123;</span><br><span class="line">            root   //前端文件目录所在路径;</span><br><span class="line">            index  index.html index.htm;</span><br><span class="line">            //try_files <span class="variable">$uri</span> <span class="variable">$uri</span>/index.html /index.html;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p><strong>开启进程所有者：</strong></p>
+<p>还是这个conf目录第一行有一行注释 “# user root”，将前面这个“#”去掉，打开nginx进程的所有者，不然会被403墙掉。</p>
+<p><strong>重新加载配置文件：</strong></p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">./nginx -s re1oad //重新加载配置</span><br></pre></td></tr></table></figure>
+
+
+
+<p><strong>启动Nginx：</strong></p>
+<p>去到nginx目录的bin目录下执行启动命令即可</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">./nginx //启动命令</span><br></pre></td></tr></table></figure>
+
+<p><strong>关闭防火墙：</strong></p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">systemctl stop firewalld</span><br></pre></td></tr></table></figure>
+
+<p><strong>测试：</strong></p>
+<p>直接浏览器访问你的服务器IP地址，如果成功展示你的页面即成功。</p>
+<h2 id="后端"><a href="#后端" class="headerlink" title="后端"></a>后端</h2><h2 id="安装数据库，Java，Nacos等"><a href="#安装数据库，Java，Nacos等" class="headerlink" title="安装数据库，Java，Nacos等"></a>安装数据库，Java，Nacos等</h2><p><strong>数据库：</strong></p>
+<p>如果你比较豪，可以直接购买云服务厂商的数据库服务，如果没有则也可以自己在服务器上安装，这里给个安装教程链接，你也可以网上自行搜索相关教程</p>
+<p><strong>Java：</strong></p>
+<p>直接执行以下安装命令即可，你也可以将自己电脑本地的JDK包使用Xftp拖拽进服务器（不过这种方式需要手动配置系统环境），建议安装JDK11及以上的版本（PS：有时候会报版本太低无法运行的错误）。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">yum install java-11-openjdk*</span><br></pre></td></tr></table></figure>
+
+<p><strong>验证：</strong></p>
+<p>执行命令，如果成功显示你所使用的java版本及安装成功</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">java --version</span><br></pre></td></tr></table></figure>
+
+<h2 id="打包本地后端项目代码"><a href="#打包本地后端项目代码" class="headerlink" title="打包本地后端项目代码"></a>打包本地后端项目代码</h2><h3 id="使用maven-命令打包"><a href="#使用maven-命令打包" class="headerlink" title="使用maven 命令打包"></a>使用maven 命令打包</h3><p><strong>打开终端，执行install</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">install</span><br></pre></td></tr></table></figure>
+
+<p>生成jar包文件后上传至服务器</p>
+<p><strong>执行jar包</strong></p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">java -jar ./你的jar包名称 <span class="comment">//当前终端执行</span></span><br><span class="line">nohup java -jar ./你的jar包名称 &amp;  <span class="comment">// 后台执行 </span></span><br><span class="line">jobs <span class="comment">//查看后台进程命令</span></span><br></pre></td></tr></table></figure>
+
+]]></content>
+      <categories>
+        <category>技术分享</category>
+      </categories>
+      <tags>
+        <tag>技术分享</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Redis分布式锁</title>
+    <url>/2023/cc4d73b2.html</url>
+    <content><![CDATA[<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>hello，大家好！今天想和大家分享一些有关Redis分布式锁相关方面的知识，以及如何手写一个分布式锁，废话不多说，我们现在开始。</p>
+<h1 id="什么是分布式锁"><a href="#什么是分布式锁" class="headerlink" title="什么是分布式锁"></a>什么是分布式锁</h1><h2 id="锁的种类"><a href="#锁的种类" class="headerlink" title="锁的种类"></a>锁的种类</h2><ul>
+<li>单机版。在同一个JVM虚拟机内的锁，如<strong>synchronized或者Lock接口</strong></li>
+<li>分布式。分布在多个JVM虚拟机内，此时单机的线程锁机制已经不起作用了，此时资源并不在同一台服务器上共享</li>
+</ul>
+<h2 id="为什么需要分布式锁？"><a href="#为什么需要分布式锁？" class="headerlink" title="为什么需要分布式锁？"></a>为什么需要分布式锁？</h2><h3 id="案例"><a href="#案例" class="headerlink" title="案例"></a>案例</h3><p>首先，随着业务的不断发展与扩大，我们不可能将所有业务和服务都部署在一台服务器上，肯定涉及到如MySQL的主从复制，Redis集群等等容灾措施。那么此时我们就面临一个问题就是如何让不同的客户端有序的访问同一个共享资源。如果是之前的单机版我们直接上锁即可，但是涉及到分布式，同一个资源整个集群里面的所有服务器共享，当一个客户端请求A发来时，可能经过Nginx反向代理到X服务器并对服务器上的共享资源上锁，但此时又有一个客户端请求B发来时，经过Nginx反向代理可能到Y服务器，此时虽然A对该资源上了锁但是仅仅是对X服务器有效，对于Y来说请求A依旧可以获取相关资源，此时就会发生冲突。可能出现<strong>超卖（在高并发环境下，大量请求同时访问同一个库存资源进行操作。这种情况下，由于多个请求可能同时读取到相同的库存数量，然后都判断库存充足并分别进行扣减操作，导致实际上库存数量被扣减得比实际的要少，从而出现超卖现象）</strong>现象，因此，我们需要分布式锁来对整个分布式集群的共享资源上锁，所有请求必须先获取到这把锁才能进行后续操作。</p>
+<p><img src="/../images/4-1.png"></p>
+<h3 id="分布式锁解决了那些问题"><a href="#分布式锁解决了那些问题" class="headerlink" title="分布式锁解决了那些问题"></a>分布式锁解决了那些问题</h3><p>####跨进程+跨服务</p>
+<p>分布式锁是一种跨进程和跨服务的技术，主要用于解决在分布式环境中多个执行线程访问共享资源时可能出现的数据不一致问题。它可以实现进程间同步访问共享资源，通过全局共享来实现全局锁的效果，从而确保数据一致性。其实现机制一般涉及共享存储系统保存锁变量，加锁和释放锁的过程需要保证操作的原子性</p>
+<h4 id="超卖现象"><a href="#超卖现象" class="headerlink" title="超卖现象"></a>超卖现象</h4><p>同上述解释类似，库存这个全局共享资源被加上分布式锁后，所有访问请求都必须获取到这把锁后才能对共享资源进行操作，这样就保证了同一时间只有一个线程对整个Redis集群里面的共享资源进行操作，保证了数据一致性。**(ps:可以思考一下这种情况下如何提高系统并发访问量)**</p>
+<h4 id="防止缓存击穿"><a href="#防止缓存击穿" class="headerlink" title="防止缓存击穿"></a>防止缓存击穿</h4><p>当Redis中没有数据时，请求往往会打到数据库上，当有大量请求都去访问数据库时，就会给数据库造成大量负担，存在一定隐患。而分布式锁就可以解决这个问题，当有大量请求过来时，只有第一个请求能拿到锁其他请求线程并进入Redis后发现没有数据，之后就去数据库请求数据，拿到数据后返回客户端并回写Redis，然后释放锁，之后的线程在Redis拿到数据后就不会再去访问数据库，起到了防止缓存击穿的作用。</p>
+<h1 id="如何手写一个分布式锁-带你走进分布式锁的原理"><a href="#如何手写一个分布式锁-带你走进分布式锁的原理" class="headerlink" title="如何手写一个分布式锁(带你走进分布式锁的原理)"></a>如何手写一个分布式锁(带你走进分布式锁的原理)</h1><h2 id="一个可靠的分布式锁应具备的刚需"><a href="#一个可靠的分布式锁应具备的刚需" class="headerlink" title="一个可靠的分布式锁应具备的刚需"></a>一个可靠的分布式锁应具备的刚需</h2><p><strong>独占性：</strong>在任何时候都要保证只能有一个线程访问</p>
+<p><strong>高可用：</strong>在Redis集群的情况下，不能因为某个节点挂了而出现上锁和解锁失败的情况，同时，在高并发的情景下，依旧能正常运行</p>
+<p><strong>防死锁</strong>：杜绝死锁，必须要有超时机制和撤销机制</p>
+<p><strong>防乱删：</strong>自己加的锁只能由自己释放，其他线程不能解其他线程的锁</p>
+<p><strong>可重入：</strong>同一个节点的同一个线程获取一把锁后，它也可以再次获取这把锁</p>
+<h2 id="版本一（setnx-递归调用）"><a href="#版本一（setnx-递归调用）" class="headerlink" title="版本一（setnx+递归调用）"></a>版本一（setnx+递归调用）</h2><p>原理：利用setnx命令先判断当前Redis集群有没有一个变量Lock，如果存在那么说明已经有线程在操作共享资源，此时就要阻塞，循环等待，等待持有锁的线程完成操作后del这把锁，此后其他线程就能进去持有锁(类比一个厕所有很多人要上，每个人进去后先锁门，解决后在开锁开门，之后其他人就能进去了),代码如下：</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="meta">@Slf4j</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">InventoryService</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> StringRedisTemplate stringRedisTemplate;</span><br><span class="line">    <span class="meta">@Value(&quot;$&#123;server.port&#125;&quot;)</span></span><br><span class="line">    <span class="keyword">private</span> String port;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="type">Lock</span> <span class="variable">lock</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ReentrantLock</span>();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">sale</span><span class="params">()</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="type">String</span> <span class="variable">retMessage</span> <span class="operator">=</span> <span class="string">&quot;&quot;</span>;</span><br><span class="line">        <span class="type">String</span> <span class="variable">key</span> <span class="operator">=</span> <span class="string">&quot;RedisLock&quot;</span>;</span><br><span class="line">        <span class="type">String</span> <span class="variable">uuidValue</span> <span class="operator">=</span> IdUtil.simpleUUID()+<span class="string">&quot;:&quot;</span>+Thread.currentThread().getId();</span><br><span class="line"></span><br><span class="line">        <span class="type">Boolean</span> <span class="variable">flag</span> <span class="operator">=</span> stringRedisTemplate.opsForValue().setIfAbsent(key, uuidValue);</span><br><span class="line">        <span class="keyword">if</span>(!flag)&#123;</span><br><span class="line">            <span class="comment">//暂停20毫秒后递归调用</span></span><br><span class="line">            <span class="keyword">try</span> &#123; TimeUnit.MILLISECONDS.sleep(<span class="number">20</span>); &#125; <span class="keyword">catch</span> (InterruptedException e) &#123; e.printStackTrace(); &#125;</span><br><span class="line">            sale();</span><br><span class="line">        &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">            <span class="keyword">try</span>&#123;</span><br><span class="line">                <span class="comment">//1 查询库存信息</span></span><br><span class="line">                <span class="type">String</span> <span class="variable">result</span> <span class="operator">=</span> stringRedisTemplate.opsForValue().get(<span class="string">&quot;inventory001&quot;</span>);</span><br><span class="line">                <span class="comment">//2 判断库存是否足够</span></span><br><span class="line">                <span class="type">Integer</span> <span class="variable">inventoryNumber</span> <span class="operator">=</span> result == <span class="literal">null</span> ? <span class="number">0</span> : Integer.parseInt(result);</span><br><span class="line">                <span class="comment">//3 扣减库存</span></span><br><span class="line">                <span class="keyword">if</span>(inventoryNumber &gt; <span class="number">0</span>) &#123;</span><br><span class="line">                    stringRedisTemplate.opsForValue().set(<span class="string">&quot;inventory001&quot;</span>,String.valueOf(--inventoryNumber));</span><br><span class="line">                    retMessage = <span class="string">&quot;成功卖出一个商品，库存剩余: &quot;</span>+inventoryNumber;</span><br><span class="line">                    System.out.println(retMessage);</span><br><span class="line">                &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">                    retMessage = <span class="string">&quot;商品卖完了，o(╥﹏╥)o&quot;</span>;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;<span class="keyword">finally</span> &#123;</span><br><span class="line">                stringRedisTemplate.delete(key);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> retMessage+<span class="string">&quot;\t&quot;</span>+<span class="string">&quot;服务端口号：&quot;</span>+port;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>缺陷：</strong>众所周知，递归存在一个比较明显的问题就是容易“栈溢出”，存在漏洞</p>
+<p><strong>改进：</strong>对JUC了解的话我们可以利用JUC里面自旋锁的思想将if改成while防止虚假唤醒，用while循环代替递归</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">while</span>(!stringRedisTemplate.opsForValue().setIfAbsent(key, uuidValue))&#123;</span><br><span class="line">            <span class="comment">//暂停20毫秒，类似CAS自旋</span></span><br><span class="line">            <span class="keyword">try</span> &#123; TimeUnit.MILLISECONDS.sleep(<span class="number">20</span>); &#125; <span class="keyword">catch</span> (InterruptedException e) &#123; e.printStackTrace(); &#125;</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="版本二-setnx-ttl"><a href="#版本二-setnx-ttl" class="headerlink" title="版本二(setnx+ttl)"></a>版本二(setnx+ttl)</h2><p><strong>版本一存在的问题：</strong>当线程上锁后，服务器宕机，导致该线程无法释放锁，这就导致后续请求无法访问Redis，造成死锁严重影响</p>
+<p><strong>解决方法：</strong>可以给锁设置一个ttl过期时间，这样即使宕机无法解锁，那么过期时间一到这把锁就会自动失效，这样后面的线程就能正常访问了</p>
+<p><strong>注意事项：</strong>加锁和加过期时间的操作必须保证原子性(原因很简单，如果先加锁，再加过期时间，那么如果加完锁后如果服务器宕机那么给锁加过期时间的操作就没有进行，那么就依旧存在上述问题)</p>
+<p><strong>较版本一修改如下</strong></p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">while</span>(!stringRedisTemplate.opsForValue().setIfAbsent(key, uuidValue,<span class="number">30L</span>,TimeUnit.SECONDS))</span><br><span class="line">       &#123;</span><br><span class="line">           <span class="comment">//暂停毫秒</span></span><br><span class="line">           <span class="keyword">try</span> &#123; TimeUnit.MILLISECONDS.sleep(<span class="number">20</span>); &#125; <span class="keyword">catch</span> (InterruptedException e) &#123; e.printStackTrace(); &#125;</span><br><span class="line">       &#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<h2 id="版本三-setnx-ttl-uuid"><a href="#版本三-setnx-ttl-uuid" class="headerlink" title="版本三(setnx+ttl+uuid)"></a>版本三(setnx+ttl+uuid)</h2><p><strong>版本二存在的问题：</strong>虽然版本二给锁加上了过期时间，但是一旦业务处理时间超过了过期时间，那么加的锁就过期失效了，那么其他线程就能访问Redis并设置新的锁，此时如果旧线程完成业务后执行del操作，将新线程的锁删除了之后，就会出现误删的情况，存在一定安全隐患。</p>
+<p><strong>改进方法：</strong>加锁时传入一个此线程的uuid，每次删除锁时，需要判断当前线程是否锁的持有线程，如果是则可以正常删除，否则阻塞。</p>
+<p><strong>较版本二修改如下</strong></p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span>(inventoryNumber &gt; <span class="number">0</span>) &#123;</span><br><span class="line">               stringRedisTemplate.opsForValue().set(<span class="string">&quot;inventory001&quot;</span>,String.valueOf(--inventoryNumber));</span><br><span class="line">               retMessage = <span class="string">&quot;成功卖出一个商品，库存剩余: &quot;</span>+inventoryNumber+<span class="string">&quot;\t&quot;</span>+uuidValue;</span><br><span class="line">               System.out.println(retMessage);</span><br><span class="line">           &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">               retMessage = <span class="string">&quot;商品卖完了，o(╥﹏╥)o&quot;</span>;</span><br><span class="line">           &#125;</span><br><span class="line">       &#125;<span class="keyword">finally</span> &#123;</span><br><span class="line">           <span class="comment">// v5.0判断加锁与解锁是不是同一个客户端，同一个才行，自己只能删除自己的锁，不误删他人的</span></span><br><span class="line">           <span class="keyword">if</span>(stringRedisTemplate.opsForValue().get(key).equalsIgnoreCase(uuidValue))&#123;</span><br><span class="line">               stringRedisTemplate.delete(key);</span><br><span class="line">           &#125;</span><br><span class="line">       &#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="版本四-setnx-ttl-uuid-lua"><a href="#版本四-setnx-ttl-uuid-lua" class="headerlink" title="版本四(setnx+ttl+uuid+lua)"></a>版本四(setnx+ttl+uuid+lua)</h2><p><strong>版本三存在的问题：</strong>finally块的判断+del操作不具备原子性</p>
+<p><strong>改进方法：</strong>使用lua脚本，将判断和删除整合一起，使之具有原子性，具体的lua脚本学习可以参考官网<br>                    <a href="https://redis.io/docs/reference/patterns/distributed-locks/">官网</a></p>
+<p><strong>较版本三修改如下</strong></p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">//V6.0 将判断+删除自己的合并为lua脚本保证原子性</span></span><br><span class="line">           <span class="type">String</span> <span class="variable">luaScript</span> <span class="operator">=</span></span><br><span class="line">                   <span class="string">&quot;if (redis.call(&#x27;get&#x27;,KEYS[1]) == ARGV[1]) then &quot;</span> +</span><br><span class="line">                       <span class="string">&quot;return redis.call(&#x27;del&#x27;,KEYS[1]) &quot;</span> +</span><br><span class="line">                   <span class="string">&quot;else &quot;</span> +</span><br><span class="line">                       <span class="string">&quot;return 0 &quot;</span> +</span><br><span class="line">                   <span class="string">&quot;end&quot;</span>;</span><br><span class="line">           stringRedisTemplate.execute(<span class="keyword">new</span> <span class="title class_">DefaultRedisScript</span>&lt;&gt;(luaScript, Boolean.class), Arrays.asList(key), uuidValue);</span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id="版本五-setnx-ttl-uuid-lua-可重入"><a href="#版本五-setnx-ttl-uuid-lua-可重入" class="headerlink" title="版本五(setnx+ttl+uuid+lua+可重入)"></a>版本五(setnx+ttl+uuid+lua+可重入)</h2><p><strong>版本四存在的问题：</strong>如何兼顾可重入性问题？关于锁的可重入可以参考JUC相关方面的知识，这里不做过多解释。如果不能实现可重入，那么如果业务需求重复调用该方法，那么第一次调用方法时上锁，第二次再次调用时该线程被自己上一次调用方法上的锁阻塞，这不是作茧自缚吗？因此实现可从入性是衡量一把锁好坏高低的一个重要指标</p>
+<p><strong>改进方法：</strong>可重入锁的基本思想就是没锁加锁，如果同一个线程再次请求获得同一把还未解锁的锁，那么计数器+1，lock几次，对应的unlock也要几次，综上，我们可以利用Redis中的hash数据结构**(Map&lt;String,Map&lt;Object,Object&gt;&gt;)**来实现</p>
+<p><strong>小总结：</strong></p>
+<ul>
+<li><strong>setnx</strong>只能解决有无锁的问题</li>
+<li><strong>hset</strong>不仅能解决有无，还能解决可重入问题</li>
+</ul>
+<p>所以，你知道设计一个Redis分布式锁该用什么命令了吗</p>
+<h3 id="设计思路"><a href="#设计思路" class="headerlink" title="设计思路"></a>设计思路</h3><h4 id="加锁lua脚本"><a href="#加锁lua脚本" class="headerlink" title="加锁lua脚本"></a>加锁lua脚本</h4><ul>
+<li>判断Redis分布式锁的key是否存在</li>
+<li>如果返回0不存在，则hset属于自己线程的锁，否则需要进一步判断这把锁是不是属于自己的</li>
+<li>如果返回0则说明不是自己的，循环等待；否则，将该锁的计数器+1</li>
+</ul>
+<figure class="highlight lua"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span> redis.call(<span class="string">&#x27;exists&#x27;</span>,KEYS[<span class="number">1</span>]) == <span class="number">0</span> <span class="keyword">or</span> redis.call(<span class="string">&#x27;hexists&#x27;</span>,KEYS[<span class="number">1</span>],ARGV[<span class="number">1</span>]) == <span class="number">1</span> <span class="keyword">then</span> </span><br><span class="line"></span><br><span class="line">  redis.call(<span class="string">&#x27;hincrby&#x27;</span>,KEYS[<span class="number">1</span>],ARGV[<span class="number">1</span>],<span class="number">1</span>) </span><br><span class="line"></span><br><span class="line">  redis.call(<span class="string">&#x27;expire&#x27;</span>,KEYS[<span class="number">1</span>],ARGV[<span class="number">2</span>]) </span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> <span class="number">1</span> </span><br><span class="line"></span><br><span class="line"><span class="keyword">else</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">end</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="解锁lua脚本"><a href="#解锁lua脚本" class="headerlink" title="解锁lua脚本"></a>解锁lua脚本</h4><ul>
+<li>判断Redis分布式锁的key是否存在</li>
+<li>如果返回0不存在，则程序直接返回nil，否则需要进一步判断这把锁是不是属于自己的</li>
+<li>返回0，说明锁不是自己的，不能删除；否则直接调用hincrby -1 对锁进行-1，减至0后直接删除</li>
+</ul>
+<figure class="highlight lua"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span> redis.call(<span class="string">&#x27;HEXISTS&#x27;</span>,KEYS[<span class="number">1</span>],ARGV[<span class="number">1</span>]) == <span class="number">0</span> <span class="keyword">then</span></span><br><span class="line"></span><br><span class="line"> <span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">elseif</span> redis.call(<span class="string">&#x27;HINCRBY&#x27;</span>,KEYS[<span class="number">1</span>],ARGV[<span class="number">1</span>],<span class="number">-1</span>) == <span class="number">0</span> <span class="keyword">then</span></span><br><span class="line"></span><br><span class="line"> <span class="keyword">return</span> redis.call(<span class="string">&#x27;del&#x27;</span>,KEYS[<span class="number">1</span>])</span><br><span class="line"></span><br><span class="line"><span class="keyword">else</span></span><br><span class="line"></span><br><span class="line"> <span class="keyword">return</span> <span class="number">0</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">end</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>代码修改</strong></p>
+<p>将上述加锁解锁lua脚本分别替换while中的循环条件和后续del的lua脚本即可</p>
+<p><strong>优化：</strong></p>
+<ul>
+<li><p>利用juc中的lock接口，通过实现lock接口实现分布式锁</p>
+</li>
+<li><p>这里只是实现了Redis分布式锁，那万一以后需要MySQL，Zookeeper分布式锁怎么办？所以这里建议引入工厂模式</p>
+</li>
+</ul>
+<h2 id="版本六-setnx-ttl-uuid-lua-可重入-自动续期"><a href="#版本六-setnx-ttl-uuid-lua-可重入-自动续期" class="headerlink" title="版本六(setnx+ttl+uuid+lua+可重入+自动续期)"></a>版本六(setnx+ttl+uuid+lua+可重入+自动续期)</h2><p><strong>版本五存在的问题：</strong>仔细观察会发现其实至始至终都没有解决业务处理时间大于锁的过期时间时的问题，哪怕是<strong>版本三</strong>我们也只是通过加一个uuid判断条件来防止锁被误删，所以我们需要给锁加一个可以自动续期的功能。</p>
+<p><strong>改进方法：</strong>通过加一个定时任务，有点类似看门狗策略，每当过期时间过了一段时间后就会自动触发，给锁自动续时间</p>
+<figure class="highlight lua"><table><tr><td class="code"><pre><span class="line">//==============自动续期</span><br><span class="line"><span class="keyword">if</span> redis.call(<span class="string">&#x27;HEXISTS&#x27;</span>,KEYS[<span class="number">1</span>],ARGV[<span class="number">1</span>]) == <span class="number">1</span> <span class="keyword">then</span></span><br><span class="line">  <span class="keyword">return</span> Vredis.call(<span class="string">&#x27;expire&#x27;</span>,KEYS[<span class="number">1</span>],ARGV[<span class="number">2</span>])</span><br><span class="line"><span class="keyword">else</span></span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span></span><br><span class="line">endV</span><br></pre></td></tr></table></figure>
+
+
+
+<p><strong>代码较版本五修改如下：</strong></p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">RedisDistributedLock</span> <span class="keyword">implements</span> <span class="title class_">Lock</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">private</span> StringRedisTemplate stringRedisTemplate;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> String lockName;<span class="comment">//KEYS[1]</span></span><br><span class="line">    <span class="keyword">private</span> String uuidValue;<span class="comment">//ARGV[1]</span></span><br><span class="line">    <span class="keyword">private</span> <span class="type">long</span>   expireTime;<span class="comment">//ARGV[2]</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="title function_">RedisDistributedLock</span><span class="params">(StringRedisTemplate stringRedisTemplate,String lockName,String uuidValue)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="built_in">this</span>.stringRedisTemplate = stringRedisTemplate;</span><br><span class="line">        <span class="built_in">this</span>.lockName = lockName;</span><br><span class="line">        <span class="built_in">this</span>.uuidValue = uuidValue+<span class="string">&quot;:&quot;</span>+Thread.currentThread().getId();</span><br><span class="line">        <span class="built_in">this</span>.expireTime = <span class="number">30L</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">lock</span><span class="params">()</span></span><br><span class="line">    &#123;</span><br><span class="line">        tryLock();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">tryLock</span><span class="params">()</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;tryLock(-<span class="number">1L</span>,TimeUnit.SECONDS);&#125; <span class="keyword">catch</span> (InterruptedException e) &#123;e.printStackTrace();&#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 干活的，实现加锁功能，实现这一个干活的就OK，全盘通用</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> time</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> unit</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span></span></span><br><span class="line"><span class="comment">     * <span class="doctag">@throws</span> InterruptedException</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">tryLock</span><span class="params">(<span class="type">long</span> time, TimeUnit unit)</span> <span class="keyword">throws</span> InterruptedException</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span>(time != -<span class="number">1L</span>)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="built_in">this</span>.expireTime = unit.toSeconds(time);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="type">String</span> <span class="variable">script</span> <span class="operator">=</span></span><br><span class="line">                <span class="string">&quot;if redis.call(&#x27;exists&#x27;,KEYS[1]) == 0 or redis.call(&#x27;hexists&#x27;,KEYS[1],ARGV[1]) == 1 then &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;redis.call(&#x27;hincrby&#x27;,KEYS[1],ARGV[1],1) &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;redis.call(&#x27;expire&#x27;,KEYS[1],ARGV[2]) &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;return 1 &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;else &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;return 0 &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;end&quot;</span>;</span><br><span class="line"></span><br><span class="line">        System.out.println(<span class="string">&quot;script: &quot;</span>+script);</span><br><span class="line">        System.out.println(<span class="string">&quot;lockName: &quot;</span>+lockName);</span><br><span class="line">        System.out.println(<span class="string">&quot;uuidValue: &quot;</span>+uuidValue);</span><br><span class="line">        System.out.println(<span class="string">&quot;expireTime: &quot;</span>+expireTime);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">while</span> (!stringRedisTemplate.execute(<span class="keyword">new</span> <span class="title class_">DefaultRedisScript</span>&lt;&gt;(script,Boolean.class), Arrays.asList(lockName),uuidValue,String.valueOf(expireTime))) &#123;</span><br><span class="line">            TimeUnit.MILLISECONDS.sleep(<span class="number">50</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="built_in">this</span>.renewExpire();</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     *干活的，实现解锁功能</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">unlock</span><span class="params">()</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="type">String</span> <span class="variable">script</span> <span class="operator">=</span></span><br><span class="line">                <span class="string">&quot;if redis.call(&#x27;HEXISTS&#x27;,KEYS[1],ARGV[1]) == 0 then &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;   return nil &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;elseif redis.call(&#x27;HINCRBY&#x27;,KEYS[1],ARGV[1],-1) == 0 then &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;   return redis.call(&#x27;del&#x27;,KEYS[1]) &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;else &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;   return 0 &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;end&quot;</span>;</span><br><span class="line">        <span class="comment">// nil = false 1 = true 0 = false</span></span><br><span class="line">        System.out.println(<span class="string">&quot;lockName: &quot;</span>+lockName);</span><br><span class="line">        System.out.println(<span class="string">&quot;uuidValue: &quot;</span>+uuidValue);</span><br><span class="line">        System.out.println(<span class="string">&quot;expireTime: &quot;</span>+expireTime);</span><br><span class="line">        <span class="type">Long</span> <span class="variable">flag</span> <span class="operator">=</span> stringRedisTemplate.execute(<span class="keyword">new</span> <span class="title class_">DefaultRedisScript</span>&lt;&gt;(script, Long.class), Arrays.asList(lockName),uuidValue,String.valueOf(expireTime));</span><br><span class="line">        <span class="keyword">if</span>(flag == <span class="literal">null</span>)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">RuntimeException</span>(<span class="string">&quot;This lock doesn&#x27;t EXIST&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">void</span> <span class="title function_">renewExpire</span><span class="params">()</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="type">String</span> <span class="variable">script</span> <span class="operator">=</span></span><br><span class="line">                <span class="string">&quot;if redis.call(&#x27;HEXISTS&#x27;,KEYS[1],ARGV[1]) == 1 then &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;return redis.call(&#x27;expire&#x27;,KEYS[1],ARGV[2]) &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;else &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;return 0 &quot;</span> +</span><br><span class="line">                        <span class="string">&quot;end&quot;</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">new</span> <span class="title class_">Timer</span>().schedule(<span class="keyword">new</span> <span class="title class_">TimerTask</span>()</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">run</span><span class="params">()</span></span><br><span class="line">            &#123;</span><br><span class="line">                <span class="keyword">if</span> (stringRedisTemplate.execute(<span class="keyword">new</span> <span class="title class_">DefaultRedisScript</span>&lt;&gt;(script, Boolean.class), Arrays.asList(lockName),uuidValue,String.valueOf(expireTime))) &#123;</span><br><span class="line">                    renewExpire();</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;,(<span class="built_in">this</span>.expireTime * <span class="number">1000</span>)/<span class="number">3</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//===下面的redis分布式锁暂时用不到=======================================</span></span><br><span class="line">    <span class="comment">//===下面的redis分布式锁暂时用不到=======================================</span></span><br><span class="line">    <span class="comment">//===下面的redis分布式锁暂时用不到=======================================</span></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">lockInterruptibly</span><span class="params">()</span> <span class="keyword">throws</span> InterruptedException</span><br><span class="line">    &#123;</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> Condition <span class="title function_">newCondition</span><span class="params">()</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><h2 id="为什么需要Redis分布式锁"><a href="#为什么需要Redis分布式锁" class="headerlink" title="为什么需要Redis分布式锁"></a>为什么需要Redis分布式锁</h2><p>单机锁只能在一台JVM虚拟机中有效，在集群的不同服务器上如果只用单机锁会存在超卖问题</p>
+<h2 id="Redis分布式锁解决了哪些问题"><a href="#Redis分布式锁解决了哪些问题" class="headerlink" title="Redis分布式锁解决了哪些问题"></a>Redis分布式锁解决了哪些问题</h2><ul>
+<li>跨进程和跨服务</li>
+<li>解决超卖</li>
+<li>防止缓存击穿</li>
+</ul>
+<h2 id="手写Redis分布式锁流程"><a href="#手写Redis分布式锁流程" class="headerlink" title="手写Redis分布式锁流程"></a>手写Redis分布式锁流程</h2><ul>
+<li>单机版synchronized，lock锁，面对分布式部署时可能出现超卖现象</li>
+<li>使用setnx命令上Redis分布式锁</li>
+<li>只是加锁了，但是没有给锁设置过期时间，如果服务器宕机会导致无法解锁，影响后续请求，因此，使用ttl命令给锁设置一个过期时间</li>
+<li>加锁和设置过期时间的操作要保证原子性</li>
+<li>设置了过期时间可能存在误删锁的情况，所以需要加上一个<strong>uuid</strong>来判断当前线程是否是锁的拥有者，只有自己才能解自己的锁</li>
+<li>为了保证<strong>uuid</strong>的判断和<strong>del</strong>删除原子性，我们可以通过引入lua脚本来保证命令原子性</li>
+<li>之后为了防止作茧自缚，我们需要让锁具有可重入性</li>
+<li>最后，我们需要给锁加个定时任务，到点自动给锁续期，保证在锁的过期时间内能够完成业务</li>
+</ul>
+]]></content>
+      <categories>
+        <category>Redis</category>
+      </categories>
+      <tags>
+        <tag>Redis知识分享</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>死信队列</title>
+    <url>/2024/1e54fa56.html</url>
+    <content><![CDATA[<h1 id="死信队列"><a href="#死信队列" class="headerlink" title="死信队列"></a>死信队列</h1><h2 id="死信的概念"><a href="#死信的概念" class="headerlink" title="死信的概念"></a><strong>死信的概念</strong></h2><p>先从概念解释上搞清楚这个定义，死信，顾名思义就是无法被消费的消息，字面意思可以这样理 解，一般来说，producer 将消息投递到 broker 或者直接到 queue 里了，consumer 从 queue 取出消息 进行消费，但某些时候由于特定的原因导致 queue 中的某些消息无法被消费，这样的消息如果没有 后续的处理，就变成了死信，有死信自然就有了死信队列。 </p>
+<p>应用场景:为了保证订单业务的消息数据不丢失，需要使用到 RabbitMQ 的死信队列机制，当消息 消费发生异常时，将消息投入死信队列中.还有比如说: 用户在商城下单成功并点击去支付后在指定时 间未支付时自动失效 </p>
+<h2 id="死信的来源"><a href="#死信的来源" class="headerlink" title="死信的来源"></a><strong>死信的来源</strong></h2><p>消息 TTL 过期 </p>
+<p>队列达到最大长度(队列满了，无法再添加数据到 mq 中) </p>
+<p>消息被拒绝(basic.reject 或 basic.nack)并且 requeue&#x3D;false. </p>
+<h2 id="架构图"><a href="#架构图" class="headerlink" title="架构图"></a>架构图</h2><p><img src="/../images/10-1.png"></p>
+<h2 id="代码实现"><a href="#代码实现" class="headerlink" title="代码实现"></a>代码实现</h2><h3 id="生产者代码实现"><a href="#生产者代码实现" class="headerlink" title="生产者代码实现"></a>生产者代码实现</h3><figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Producer</span> &#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String NORMAL_EXCHANEG=<span class="string">&quot;normal_exchange&quot;</span>;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception&#123;</span><br><span class="line"></span><br><span class="line">        <span class="type">ConnectionFactory</span> <span class="variable">factory</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ConnectionFactory</span>();</span><br><span class="line">        factory.setHost(<span class="string">&quot;192.168.19.3&quot;</span>);</span><br><span class="line">        factory.setUsername(<span class="string">&quot;admin&quot;</span>);</span><br><span class="line">        factory.setPassword(<span class="string">&quot;123&quot;</span>);</span><br><span class="line">        <span class="type">Connection</span> <span class="variable">connection</span> <span class="operator">=</span> factory.newConnection();</span><br><span class="line">        <span class="comment">//创建信道</span></span><br><span class="line">        <span class="type">Channel</span> <span class="variable">channel</span> <span class="operator">=</span> connection.createChannel();</span><br><span class="line"></span><br><span class="line">        <span class="comment">//声明普通交换机</span></span><br><span class="line">        channel.exchangeDeclare(NORMAL_EXCHANEG, <span class="string">&quot;direct&quot;</span>);</span><br><span class="line"></span><br><span class="line">        <span class="type">Scanner</span> <span class="variable">scanner</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Scanner</span>(System.in);</span><br><span class="line"></span><br><span class="line">        <span class="comment">//队列属性，设置10s的消息过期时间</span></span><br><span class="line">        AMQP.<span class="type">BasicProperties</span> <span class="variable">basicProperties</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">AMQP</span>.BasicProperties();</span><br><span class="line">        basicProperties.builder().expiration(<span class="string">&quot;1&quot;</span>).build();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">while</span> (scanner.hasNext())</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="type">String</span> <span class="variable">message</span> <span class="operator">=</span> scanner.nextLine();</span><br><span class="line">            channel.basicPublish(NORMAL_EXCHANEG, <span class="string">&quot;zhangsan&quot;</span>, <span class="literal">null</span>, message.getBytes());</span><br><span class="line">            System.out.println(<span class="string">&quot;消息发送完毕:&quot;</span>+message);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="普通、死信队列"><a href="#普通、死信队列" class="headerlink" title="普通、死信队列"></a>普通、死信队列</h3><figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">DeadQueue</span> &#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String NORMAL_EXCHANEG=<span class="string">&quot;normal_exchange&quot;</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String DEAD_EXCHANGE=<span class="string">&quot;dead_exchange&quot;</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String NORMAL_QUEUE=<span class="string">&quot;noamal_queue&quot;</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String DEAD_QUEUE=<span class="string">&quot;dead_queue&quot;</span>;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception&#123;</span><br><span class="line">        <span class="comment">//与消息队列建立连接</span></span><br><span class="line">        <span class="type">ConnectionFactory</span> <span class="variable">factory</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ConnectionFactory</span>();</span><br><span class="line">        factory.setHost(<span class="string">&quot;192.168.19.3&quot;</span>);</span><br><span class="line">        factory.setUsername(<span class="string">&quot;admin&quot;</span>);</span><br><span class="line">        factory.setPassword(<span class="string">&quot;123&quot;</span>);</span><br><span class="line">        <span class="type">Connection</span> <span class="variable">connection</span> <span class="operator">=</span> factory.newConnection();</span><br><span class="line">        <span class="comment">//创建信道</span></span><br><span class="line">        <span class="type">Channel</span> <span class="variable">channel</span> <span class="operator">=</span> connection.createChannel();</span><br><span class="line"></span><br><span class="line">        <span class="comment">//声明普通和死信交换机</span></span><br><span class="line">        channel.exchangeDeclare(NORMAL_EXCHANEG, <span class="string">&quot;direct&quot;</span>);</span><br><span class="line">        channel.exchangeDeclare(DEAD_EXCHANGE, <span class="string">&quot;direct&quot;</span>);</span><br><span class="line"></span><br><span class="line">        <span class="comment">//连接死信队列参数配置</span></span><br><span class="line">        Map&lt;String, Object&gt; argement = <span class="keyword">new</span> <span class="title class_">HashMap</span>&lt;&gt;();</span><br><span class="line">        argement.put(<span class="string">&quot;x-dead-letter-exchange&quot;</span>, DEAD_EXCHANGE);</span><br><span class="line">        argement.put(<span class="string">&quot;x-dead-letter-routing-key&quot;</span>, <span class="string">&quot;lisi&quot;</span>);</span><br><span class="line">        argement.put(<span class="string">&quot;x-max-length&quot;</span>, <span class="number">2</span>);</span><br><span class="line"></span><br><span class="line">        <span class="comment">//声明普通和死信队列</span></span><br><span class="line">        channel.queueDeclare(NORMAL_QUEUE, <span class="literal">false</span>, <span class="literal">false</span>, <span class="literal">false</span>, argement);</span><br><span class="line">        channel.queueDeclare(DEAD_QUEUE, <span class="literal">false</span>, <span class="literal">false</span>, <span class="literal">false</span>, <span class="literal">null</span>);</span><br><span class="line"></span><br><span class="line">        <span class="comment">//队列绑定交换机</span></span><br><span class="line">        channel.queueBind(NORMAL_QUEUE, NORMAL_EXCHANEG, <span class="string">&quot;zhangsan&quot;</span>);</span><br><span class="line">        channel.queueBind(DEAD_QUEUE, DEAD_EXCHANGE, <span class="string">&quot;lisi&quot;</span>);</span><br><span class="line">        <span class="type">DeliverCallback</span> <span class="variable">deliverCallback1</span> <span class="operator">=</span> (consumerTag, delivery)-&gt;&#123;</span><br><span class="line">            <span class="comment">//直接拒绝不重新放回队列</span></span><br><span class="line">            <span class="comment">//channel.basicReject(delivery.getEnvelope().getDeliveryTag(), false);</span></span><br><span class="line">            <span class="type">String</span> <span class="variable">message</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(delivery.getBody(), <span class="string">&quot;UTF-8&quot;</span>);</span><br><span class="line">            System.out.println(<span class="string">&quot;普通队列消费者消费消息:&quot;</span>+message);</span><br><span class="line">        &#125;;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">       channel.basicConsume(NORMAL_QUEUE, <span class="literal">false</span>, deliverCallback1,consumerTag -&gt; &#123;&#125;);</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="死信队列消费者"><a href="#死信队列消费者" class="headerlink" title="死信队列消费者"></a>死信队列消费者</h3><figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">DeadQueueConsumer</span> &#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String DEAD_QUEUE=<span class="string">&quot;dead_queue&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception&#123;</span><br><span class="line">        <span class="comment">//与消息队列建立连接</span></span><br><span class="line">        <span class="type">ConnectionFactory</span> <span class="variable">factory</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ConnectionFactory</span>();</span><br><span class="line">        factory.setHost(<span class="string">&quot;192.168.19.3&quot;</span>);</span><br><span class="line">        factory.setUsername(<span class="string">&quot;admin&quot;</span>);</span><br><span class="line">        factory.setPassword(<span class="string">&quot;123&quot;</span>);</span><br><span class="line">        <span class="type">Connection</span> <span class="variable">connection</span> <span class="operator">=</span> factory.newConnection();</span><br><span class="line">        <span class="comment">//创建信道</span></span><br><span class="line">        <span class="type">Channel</span> <span class="variable">channel</span> <span class="operator">=</span> connection.createChannel();</span><br><span class="line"></span><br><span class="line">        <span class="type">DeliverCallback</span> <span class="variable">deliverCallback2</span> <span class="operator">=</span> (consumerTag, delivery)-&gt;&#123;</span><br><span class="line">            <span class="type">String</span> <span class="variable">message</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(delivery.getBody(), <span class="string">&quot;UTF-8&quot;</span>);</span><br><span class="line">            System.out.println(<span class="string">&quot;死信队列消费者消费消息:&quot;</span>+message);</span><br><span class="line">        &#125;;</span><br><span class="line"></span><br><span class="line">        channel.basicConsume(DEAD_QUEUE, <span class="literal">false</span>, deliverCallback2, consumerTag -&gt; &#123;&#125;);</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="消息进入死信队列的三种情况"><a href="#消息进入死信队列的三种情况" class="headerlink" title="消息进入死信队列的三种情况"></a>消息进入死信队列的三种情况</h2><h3 id="消息过期"><a href="#消息过期" class="headerlink" title="消息过期"></a>消息过期</h3><figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">//在消息生产者端设置消息的过期时间,10s后过期未消费则进入死信队列</span></span><br><span class="line"> AMQP.<span class="type">BasicProperties</span> <span class="variable">basicProperties</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">AMQP</span>.BasicProperties();</span><br><span class="line">        basicProperties.builder().expiration(<span class="string">&quot;10000&quot;</span>).build();</span><br></pre></td></tr></table></figure>
+
+<h3 id="消息被拒绝"><a href="#消息被拒绝" class="headerlink" title="消息被拒绝"></a>消息被拒绝</h3><p>在普通队列的消费者端中直接拒绝消息，消息则会自动进入死信队列</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="type">DeliverCallback</span> <span class="variable">deliverCallback1</span> <span class="operator">=</span> (consumerTag, delivery)-&gt;&#123;</span><br><span class="line">            <span class="comment">//直接拒绝不重新放回队列</span></span><br><span class="line">            channel.basicReject(delivery.getEnvelope().getDeliveryTag(), <span class="literal">false</span>);</span><br><span class="line">            <span class="type">String</span> <span class="variable">message</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(delivery.getBody(), <span class="string">&quot;UTF-8&quot;</span>);</span><br><span class="line">            System.out.println(<span class="string">&quot;普通队列消费者消费消息:&quot;</span>+message);</span><br><span class="line">        &#125;;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">       channel.basicConsume(NORMAL_QUEUE, <span class="literal">false</span>, deliverCallback1,consumerTag -&gt; &#123;&#125;);</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<h2 id="队列达到了最大长度"><a href="#队列达到了最大长度" class="headerlink" title="队列达到了最大长度"></a>队列达到了最大长度</h2><p>在普通队列声明时传入参数argement，设置普通队列长度为2，超过两条消息后的消息会写入死信队列</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">//连接死信队列参数配置</span></span><br><span class="line">        Map&lt;String, Object&gt; argement = <span class="keyword">new</span> <span class="title class_">HashMap</span>&lt;&gt;();</span><br><span class="line">        argement.put(<span class="string">&quot;x-dead-letter-exchange&quot;</span>, DEAD_EXCHANGE);</span><br><span class="line">        argement.put(<span class="string">&quot;x-dead-letter-routing-key&quot;</span>, <span class="string">&quot;lisi&quot;</span>);</span><br><span class="line">        argement.put(<span class="string">&quot;x-max-length&quot;</span>, <span class="number">2</span>);</span><br><span class="line"></span><br><span class="line">        <span class="comment">//声明普通和死信队列</span></span><br><span class="line">        channel.queueDeclare(NORMAL_QUEUE, <span class="literal">false</span>, <span class="literal">false</span>, <span class="literal">false</span>, argement);</span><br></pre></td></tr></table></figure>
+
+]]></content>
+      <categories>
+        <category>消息队列</category>
+      </categories>
+      <tags>
+        <tag>消息队列</tag>
       </tags>
   </entry>
   <entry>
@@ -1550,37 +1581,6 @@
       </tags>
   </entry>
   <entry>
-    <title>死信队列</title>
-    <url>/2024/1e54fa56.html</url>
-    <content><![CDATA[<h1 id="死信队列"><a href="#死信队列" class="headerlink" title="死信队列"></a>死信队列</h1><h2 id="死信的概念"><a href="#死信的概念" class="headerlink" title="死信的概念"></a><strong>死信的概念</strong></h2><p>先从概念解释上搞清楚这个定义，死信，顾名思义就是无法被消费的消息，字面意思可以这样理 解，一般来说，producer 将消息投递到 broker 或者直接到 queue 里了，consumer 从 queue 取出消息 进行消费，但某些时候由于特定的原因导致 queue 中的某些消息无法被消费，这样的消息如果没有 后续的处理，就变成了死信，有死信自然就有了死信队列。 </p>
-<p>应用场景:为了保证订单业务的消息数据不丢失，需要使用到 RabbitMQ 的死信队列机制，当消息 消费发生异常时，将消息投入死信队列中.还有比如说: 用户在商城下单成功并点击去支付后在指定时 间未支付时自动失效 </p>
-<h2 id="死信的来源"><a href="#死信的来源" class="headerlink" title="死信的来源"></a><strong>死信的来源</strong></h2><p>消息 TTL 过期 </p>
-<p>队列达到最大长度(队列满了，无法再添加数据到 mq 中) </p>
-<p>消息被拒绝(basic.reject 或 basic.nack)并且 requeue&#x3D;false. </p>
-<h2 id="架构图"><a href="#架构图" class="headerlink" title="架构图"></a>架构图</h2><p><img src="/../images/10-1.png"></p>
-<h2 id="代码实现"><a href="#代码实现" class="headerlink" title="代码实现"></a>代码实现</h2><h3 id="生产者代码实现"><a href="#生产者代码实现" class="headerlink" title="生产者代码实现"></a>生产者代码实现</h3><figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Producer</span> &#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String NORMAL_EXCHANEG=<span class="string">&quot;normal_exchange&quot;</span>;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception&#123;</span><br><span class="line"></span><br><span class="line">        <span class="type">ConnectionFactory</span> <span class="variable">factory</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ConnectionFactory</span>();</span><br><span class="line">        factory.setHost(<span class="string">&quot;192.168.19.3&quot;</span>);</span><br><span class="line">        factory.setUsername(<span class="string">&quot;admin&quot;</span>);</span><br><span class="line">        factory.setPassword(<span class="string">&quot;123&quot;</span>);</span><br><span class="line">        <span class="type">Connection</span> <span class="variable">connection</span> <span class="operator">=</span> factory.newConnection();</span><br><span class="line">        <span class="comment">//创建信道</span></span><br><span class="line">        <span class="type">Channel</span> <span class="variable">channel</span> <span class="operator">=</span> connection.createChannel();</span><br><span class="line"></span><br><span class="line">        <span class="comment">//声明普通交换机</span></span><br><span class="line">        channel.exchangeDeclare(NORMAL_EXCHANEG, <span class="string">&quot;direct&quot;</span>);</span><br><span class="line"></span><br><span class="line">        <span class="type">Scanner</span> <span class="variable">scanner</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Scanner</span>(System.in);</span><br><span class="line"></span><br><span class="line">        <span class="comment">//队列属性，设置10s的消息过期时间</span></span><br><span class="line">        AMQP.<span class="type">BasicProperties</span> <span class="variable">basicProperties</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">AMQP</span>.BasicProperties();</span><br><span class="line">        basicProperties.builder().expiration(<span class="string">&quot;1&quot;</span>).build();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">while</span> (scanner.hasNext())</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="type">String</span> <span class="variable">message</span> <span class="operator">=</span> scanner.nextLine();</span><br><span class="line">            channel.basicPublish(NORMAL_EXCHANEG, <span class="string">&quot;zhangsan&quot;</span>, <span class="literal">null</span>, message.getBytes());</span><br><span class="line">            System.out.println(<span class="string">&quot;消息发送完毕:&quot;</span>+message);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h3 id="普通、死信队列"><a href="#普通、死信队列" class="headerlink" title="普通、死信队列"></a>普通、死信队列</h3><figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">DeadQueue</span> &#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String NORMAL_EXCHANEG=<span class="string">&quot;normal_exchange&quot;</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String DEAD_EXCHANGE=<span class="string">&quot;dead_exchange&quot;</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String NORMAL_QUEUE=<span class="string">&quot;noamal_queue&quot;</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String DEAD_QUEUE=<span class="string">&quot;dead_queue&quot;</span>;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception&#123;</span><br><span class="line">        <span class="comment">//与消息队列建立连接</span></span><br><span class="line">        <span class="type">ConnectionFactory</span> <span class="variable">factory</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ConnectionFactory</span>();</span><br><span class="line">        factory.setHost(<span class="string">&quot;192.168.19.3&quot;</span>);</span><br><span class="line">        factory.setUsername(<span class="string">&quot;admin&quot;</span>);</span><br><span class="line">        factory.setPassword(<span class="string">&quot;123&quot;</span>);</span><br><span class="line">        <span class="type">Connection</span> <span class="variable">connection</span> <span class="operator">=</span> factory.newConnection();</span><br><span class="line">        <span class="comment">//创建信道</span></span><br><span class="line">        <span class="type">Channel</span> <span class="variable">channel</span> <span class="operator">=</span> connection.createChannel();</span><br><span class="line"></span><br><span class="line">        <span class="comment">//声明普通和死信交换机</span></span><br><span class="line">        channel.exchangeDeclare(NORMAL_EXCHANEG, <span class="string">&quot;direct&quot;</span>);</span><br><span class="line">        channel.exchangeDeclare(DEAD_EXCHANGE, <span class="string">&quot;direct&quot;</span>);</span><br><span class="line"></span><br><span class="line">        <span class="comment">//连接死信队列参数配置</span></span><br><span class="line">        Map&lt;String, Object&gt; argement = <span class="keyword">new</span> <span class="title class_">HashMap</span>&lt;&gt;();</span><br><span class="line">        argement.put(<span class="string">&quot;x-dead-letter-exchange&quot;</span>, DEAD_EXCHANGE);</span><br><span class="line">        argement.put(<span class="string">&quot;x-dead-letter-routing-key&quot;</span>, <span class="string">&quot;lisi&quot;</span>);</span><br><span class="line">        argement.put(<span class="string">&quot;x-max-length&quot;</span>, <span class="number">2</span>);</span><br><span class="line"></span><br><span class="line">        <span class="comment">//声明普通和死信队列</span></span><br><span class="line">        channel.queueDeclare(NORMAL_QUEUE, <span class="literal">false</span>, <span class="literal">false</span>, <span class="literal">false</span>, argement);</span><br><span class="line">        channel.queueDeclare(DEAD_QUEUE, <span class="literal">false</span>, <span class="literal">false</span>, <span class="literal">false</span>, <span class="literal">null</span>);</span><br><span class="line"></span><br><span class="line">        <span class="comment">//队列绑定交换机</span></span><br><span class="line">        channel.queueBind(NORMAL_QUEUE, NORMAL_EXCHANEG, <span class="string">&quot;zhangsan&quot;</span>);</span><br><span class="line">        channel.queueBind(DEAD_QUEUE, DEAD_EXCHANGE, <span class="string">&quot;lisi&quot;</span>);</span><br><span class="line">        <span class="type">DeliverCallback</span> <span class="variable">deliverCallback1</span> <span class="operator">=</span> (consumerTag, delivery)-&gt;&#123;</span><br><span class="line">            <span class="comment">//直接拒绝不重新放回队列</span></span><br><span class="line">            <span class="comment">//channel.basicReject(delivery.getEnvelope().getDeliveryTag(), false);</span></span><br><span class="line">            <span class="type">String</span> <span class="variable">message</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(delivery.getBody(), <span class="string">&quot;UTF-8&quot;</span>);</span><br><span class="line">            System.out.println(<span class="string">&quot;普通队列消费者消费消息:&quot;</span>+message);</span><br><span class="line">        &#125;;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">       channel.basicConsume(NORMAL_QUEUE, <span class="literal">false</span>, deliverCallback1,consumerTag -&gt; &#123;&#125;);</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h3 id="死信队列消费者"><a href="#死信队列消费者" class="headerlink" title="死信队列消费者"></a>死信队列消费者</h3><figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">DeadQueueConsumer</span> &#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String DEAD_QUEUE=<span class="string">&quot;dead_queue&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception&#123;</span><br><span class="line">        <span class="comment">//与消息队列建立连接</span></span><br><span class="line">        <span class="type">ConnectionFactory</span> <span class="variable">factory</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ConnectionFactory</span>();</span><br><span class="line">        factory.setHost(<span class="string">&quot;192.168.19.3&quot;</span>);</span><br><span class="line">        factory.setUsername(<span class="string">&quot;admin&quot;</span>);</span><br><span class="line">        factory.setPassword(<span class="string">&quot;123&quot;</span>);</span><br><span class="line">        <span class="type">Connection</span> <span class="variable">connection</span> <span class="operator">=</span> factory.newConnection();</span><br><span class="line">        <span class="comment">//创建信道</span></span><br><span class="line">        <span class="type">Channel</span> <span class="variable">channel</span> <span class="operator">=</span> connection.createChannel();</span><br><span class="line"></span><br><span class="line">        <span class="type">DeliverCallback</span> <span class="variable">deliverCallback2</span> <span class="operator">=</span> (consumerTag, delivery)-&gt;&#123;</span><br><span class="line">            <span class="type">String</span> <span class="variable">message</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(delivery.getBody(), <span class="string">&quot;UTF-8&quot;</span>);</span><br><span class="line">            System.out.println(<span class="string">&quot;死信队列消费者消费消息:&quot;</span>+message);</span><br><span class="line">        &#125;;</span><br><span class="line"></span><br><span class="line">        channel.basicConsume(DEAD_QUEUE, <span class="literal">false</span>, deliverCallback2, consumerTag -&gt; &#123;&#125;);</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h2 id="消息进入死信队列的三种情况"><a href="#消息进入死信队列的三种情况" class="headerlink" title="消息进入死信队列的三种情况"></a>消息进入死信队列的三种情况</h2><h3 id="消息过期"><a href="#消息过期" class="headerlink" title="消息过期"></a>消息过期</h3><figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">//在消息生产者端设置消息的过期时间,10s后过期未消费则进入死信队列</span></span><br><span class="line"> AMQP.<span class="type">BasicProperties</span> <span class="variable">basicProperties</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">AMQP</span>.BasicProperties();</span><br><span class="line">        basicProperties.builder().expiration(<span class="string">&quot;10000&quot;</span>).build();</span><br></pre></td></tr></table></figure>
-
-<h3 id="消息被拒绝"><a href="#消息被拒绝" class="headerlink" title="消息被拒绝"></a>消息被拒绝</h3><p>在普通队列的消费者端中直接拒绝消息，消息则会自动进入死信队列</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="type">DeliverCallback</span> <span class="variable">deliverCallback1</span> <span class="operator">=</span> (consumerTag, delivery)-&gt;&#123;</span><br><span class="line">            <span class="comment">//直接拒绝不重新放回队列</span></span><br><span class="line">            channel.basicReject(delivery.getEnvelope().getDeliveryTag(), <span class="literal">false</span>);</span><br><span class="line">            <span class="type">String</span> <span class="variable">message</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(delivery.getBody(), <span class="string">&quot;UTF-8&quot;</span>);</span><br><span class="line">            System.out.println(<span class="string">&quot;普通队列消费者消费消息:&quot;</span>+message);</span><br><span class="line">        &#125;;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">       channel.basicConsume(NORMAL_QUEUE, <span class="literal">false</span>, deliverCallback1,consumerTag -&gt; &#123;&#125;);</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<h2 id="队列达到了最大长度"><a href="#队列达到了最大长度" class="headerlink" title="队列达到了最大长度"></a>队列达到了最大长度</h2><p>在普通队列声明时传入参数argement，设置普通队列长度为2，超过两条消息后的消息会写入死信队列</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">//连接死信队列参数配置</span></span><br><span class="line">        Map&lt;String, Object&gt; argement = <span class="keyword">new</span> <span class="title class_">HashMap</span>&lt;&gt;();</span><br><span class="line">        argement.put(<span class="string">&quot;x-dead-letter-exchange&quot;</span>, DEAD_EXCHANGE);</span><br><span class="line">        argement.put(<span class="string">&quot;x-dead-letter-routing-key&quot;</span>, <span class="string">&quot;lisi&quot;</span>);</span><br><span class="line">        argement.put(<span class="string">&quot;x-max-length&quot;</span>, <span class="number">2</span>);</span><br><span class="line"></span><br><span class="line">        <span class="comment">//声明普通和死信队列</span></span><br><span class="line">        channel.queueDeclare(NORMAL_QUEUE, <span class="literal">false</span>, <span class="literal">false</span>, <span class="literal">false</span>, argement);</span><br></pre></td></tr></table></figure>
-
-]]></content>
-      <categories>
-        <category>消息队列</category>
-      </categories>
-      <tags>
-        <tag>消息队列</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>消息队列应用及其分类</title>
     <url>/2024/6ca58461.html</url>
     <content><![CDATA[<h1 id="消息队列应用及其分类"><a href="#消息队列应用及其分类" class="headerlink" title="消息队列应用及其分类"></a>消息队列应用及其分类</h1><h2 id="1-什么是MQ"><a href="#1-什么是MQ" class="headerlink" title="1.什么是MQ"></a>1.什么是MQ</h2><p>MQ(message queue)，从字面意思上看，<strong>本质是个队列，FIFO 先入先出</strong>，<strong>只不过队列中存放的内容是message 而已</strong>，还是一种跨进程的通信机制，用于上下游传递消息。在互联网架构中，MQ 是一种非常常 见的上下游“逻辑解耦+物理解耦”的消息通信服务。使用了 MQ 之后，消息发送上游只需要依赖 MQ，不 用依赖其他服务。 <strong>应用于程序之间的一种通信方法，帮助程序之间高效安全的传递消息</strong>。</p>
@@ -1822,13 +1822,13 @@
       </tags>
   </entry>
   <entry>
-    <title>categories</title>
-    <url>/categories/index.html</url>
+    <title>友情链接</title>
+    <url>/link/index.html</url>
     <content><![CDATA[]]></content>
   </entry>
   <entry>
-    <title>友情链接</title>
-    <url>/link/index.html</url>
+    <title>categories</title>
+    <url>/categories/index.html</url>
     <content><![CDATA[]]></content>
   </entry>
   <entry>
